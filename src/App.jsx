@@ -33,7 +33,7 @@ function normalizeQuestion(question) {
 
 function App() {
   const [playerName, setPlayerName] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('random')
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [questions, setQuestions] = useState([])
   const [screen, setScreen] = useState('start')
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -80,6 +80,10 @@ function App() {
   const loadQuestions = async () => {
     if (!playerName.trim()) {
       setError('Please enter your player name to start.')
+      return
+    }
+    if (!selectedCategory) {
+      setError('Please choose a category to start.')
       return
     }
 
@@ -136,6 +140,22 @@ function App() {
 
   const handleResetToStart = () => {
     setScreen('start')
+    setPlayerName('')
+    setSelectedCategory('')
+    setQuestions([])
+    setCurrentQuestionIndex(0)
+    setSelectedAnswer('')
+    setAnswerStatus('')
+    setScore(0)
+    setCorrectCount(0)
+    setIncorrectCount(0)
+    setError('')
+    setIsScoreSaved(false)
+  }
+
+  const handlePlayAgain = () => {
+    setScreen('start')
+    setSelectedCategory('')
     setQuestions([])
     setCurrentQuestionIndex(0)
     setSelectedAnswer('')
@@ -227,20 +247,38 @@ function App() {
                 </div>
 
                 <div className="w-full max-w-[23rem] space-y-3 text-left">
-                  <label
-                    htmlFor="playerName"
-                    className="block text-sm font-bold uppercase tracking-wide text-slate-700"
-                  >
-                    Player Name
-                  </label>
-                  <input
-                    id="playerName"
-                    type="text"
-                    value={playerName}
-                    onChange={(event) => setPlayerName(event.target.value)}
-                    className="w-full rounded-xl border-2 border-slate-900 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none ring-offset-2 focus:ring-2 focus:ring-slate-900"
-                    placeholder="Enter your name"
-                  />
+                  {playerName.trim() ? (
+                    <div className="rounded-xl border-2 border-slate-900 bg-white px-3 py-2">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-600">Player</p>
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        <p className="text-base font-extrabold text-slate-900">{playerName}</p>
+                        <button
+                          type="button"
+                          className="rounded-md border border-slate-700 px-2 py-1 text-xs font-bold text-slate-800 hover:bg-slate-100"
+                          onClick={() => setPlayerName('')}
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <label
+                        htmlFor="playerName"
+                        className="block text-sm font-bold uppercase tracking-wide text-slate-700"
+                      >
+                        Player Name
+                      </label>
+                      <input
+                        id="playerName"
+                        type="text"
+                        value={playerName}
+                        onChange={(event) => setPlayerName(event.target.value)}
+                        className="w-full rounded-xl border-2 border-slate-900 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none ring-offset-2 focus:ring-2 focus:ring-slate-900"
+                        placeholder="Enter your name"
+                      />
+                    </>
+                  )}
 
                   <label
                     htmlFor="category"
@@ -254,6 +292,9 @@ function App() {
                     onChange={(event) => setSelectedCategory(event.target.value)}
                     className="w-full rounded-xl border-2 border-slate-900 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none ring-offset-2 focus:ring-2 focus:ring-slate-900"
                   >
+                    <option value="" disabled>
+                      Select a category
+                    </option>
                     {CATEGORY_OPTIONS.map((option) => (
                       <option key={option.id} value={option.id}>
                         {option.label}
@@ -272,7 +313,7 @@ function App() {
                     className="mx-auto block rounded-xl border-2 border-slate-900 bg-white px-10 py-3 text-lg font-extrabold tracking-wide text-slate-900 transition hover:bg-slate-100"
                     onClick={loadQuestions}
                   >
-                    START
+                    START ROUND
                   </button>
                 </div>
               </section>
@@ -418,7 +459,7 @@ function App() {
                     <button
                       type="button"
                       className="flex-1 rounded-xl border-2 border-slate-900 bg-white px-5 py-2 text-base font-bold text-slate-900 transition hover:bg-slate-100"
-                      onClick={loadQuestions}
+                      onClick={handlePlayAgain}
                     >
                       Play Again
                     </button>
