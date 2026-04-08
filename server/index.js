@@ -1,0 +1,104 @@
+import cors from 'cors'
+import express from 'express'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const app = express()
+const port = process.env.PORT || 8787
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const dataDirectory = path.join(__dirname, 'data')
+const leaderboardFile = path.join(dataDirectory, 'leaderboard.json')
+
+app.use(cors())
+app.use(express.json())
+
+function ensureLeaderboardFile() {
+  if (!fs.existsSync(dataDirectory)) {
+    fs.mkdirSync(dataDirectory, { recursive: true })
+  }
+
+  if (!fs.existsSync(leaderboardFile)) {
+    fs.writeFileSync(leaderboardFile, JSON.stringify([], null, 2), 'utf-8')
+  }
+}
+
+function readLeaderboard() {
+  ensureLeaderboardFile()
+  const data = fs.readFileSync(leaderboardFile, 'utf-8')
+  const parsed = JSON.parse(data)
+  return Array.isArray(parsed) ? parsed : []
+}
+
+function sortLeaderboard(entries) {
+  return entries
+    .sort((a, b) => (b.score - a.score) || (b.correctCount - a.correctCount))
+    .slice(0, 10)
+}
+
+function writeLeaderboard(entries) {
+  ensureLeaderboardFile()
+  fs.writeFileSync(leaderboardFile, JSON.stringify(sortLeaderboard(entries), null, 2), 'utf-8')
+}
+
+app.get('/api/leaderboard', (_request, response) => {
+  try {
+    const leaderboard = sortLeaderboard(readLeaderboard())
+    response.json(leaderboard)
+  } catch {
+    response.status(500).json({ message: 'Could not load leaderboard.' })
+  }
+})
+
+app.post('/api/leaderboard', (request, response) => {
+  const { name, category, score, correctCount, incorrectCount } = request.body ?? {}
+
+  if (!name || typeof name !== 'string') {
+    response.status(400).json({ message: 'Name is required.' })
+    return
+  }
+
+  if (!category || typeof category !== 'string') {
+    response.status(400).json({ message: 'Category is required.' })
+    return
+  }
+
+  const parsedScore = Number(score)
+  const parsedCorrectCount = Number(correctCount)
+  const parsedIncorrectCount = Number(incorrectCount)
+
+  if (
+    !Number.isFinite(parsedScore) ||
+    !Number.isFinite(parsedCorrectCount) ||
+    !Number.isFinite(parsedIncorrectCount)
+  ) {
+    response.status(400).json({ message: 'Invalid score payload.' })
+    return
+  }
+
+  try {
+    const leaderboard = readLeaderboard()
+    const nextEntry = {
+      id: crypto.randomUUID(),
+      name: name.trim().slice(0, 30),
+      category: category.trim().slice(0, 40),
+      score: parsedScore,
+      correctCount: parsedCorrectCount,
+      incorrectCount: parsedIncorrectCount,
+      createdAt: new Date().toISOString(),
+    }
+
+    const updatedLeaderboard = sortLeaderboard([...leaderboard, nextEntry])
+    writeLeaderboard(updatedLeaderboard)
+    response.status(201).json(updatedLeaderboard)
+  } catch {
+    response.status(500).json({ message: 'Could not save leaderboard.' })
+  }
+})
+
+app.listen(port, () => {
+  ensureLeaderboardFile()
+  console.log(`Brain Busters leaderboard server listening on port ${port}`)
+})
