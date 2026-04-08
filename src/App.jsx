@@ -2,6 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchTriviaQuestions } from './services/triviaApi'
 import brainBustersLogo from './assets/brain-busters-logo.svg'
 
+const CATEGORY_OPTIONS = [
+  { id: '9', label: 'General Knowledge' },
+  { id: '22', label: 'Geography' },
+  { id: '23', label: 'History' },
+  { id: '17', label: 'Science & Nature' },
+  { id: '21', label: 'Sports' },
+  { id: 'random', label: 'Random' },
+]
+
 function decodeHtmlEntities(value) {
   const parser = new DOMParser()
   return parser.parseFromString(value, 'text/html').documentElement.textContent ?? value
@@ -24,17 +33,27 @@ function normalizeQuestion(question) {
 
 function App() {
   const [playerName, setPlayerName] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('random')
   const [questions, setQuestions] = useState([])
   const [screen, setScreen] = useState('start')
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState('')
   const [answerStatus, setAnswerStatus] = useState('')
   const [score, setScore] = useState(0)
+  const [correctCount, setCorrectCount] = useState(0)
+  const [incorrectCount, setIncorrectCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [leaderboard, setLeaderboard] = useState([])
+  const [isScoreSaved, setIsScoreSaved] = useState(false)
 
   const currentQuestion = questions[currentQuestionIndex]
+  const hasAnsweredCurrentQuestion = selectedAnswer.length > 0
+
+  const selectedCategoryLabel = useMemo(
+    () => CATEGORY_OPTIONS.find((option) => option.id === selectedCategory)?.label ?? 'Random',
+    [selectedCategory],
+  )
 
   const progressLabel = useMemo(() => {
     if (!questions.length || screen === 'complete') {
@@ -43,8 +62,6 @@ function App() {
 
     return `${currentQuestionIndex + 1}/${questions.length}`
   }, [questions.length, currentQuestionIndex, screen])
-
-  const hasAnsweredCurrentQuestion = selectedAnswer.length > 0
 
   useEffect(() => {
     const storedLeaderboard = localStorage.getItem('brain-busters-leaderboard')
@@ -68,13 +85,18 @@ function App() {
 
     setIsLoading(true)
     setError('')
+    setQuestions([])
     setScore(0)
+    setCorrectCount(0)
+    setIncorrectCount(0)
     setSelectedAnswer('')
     setAnswerStatus('')
     setCurrentQuestionIndex(0)
+    setIsScoreSaved(false)
 
     try {
-      const rawQuestions = await fetchTriviaQuestions(10)
+      const requestedCategory = selectedCategory === 'random' ? undefined : selectedCategory
+      const rawQuestions = await fetchTriviaQuestions(10, requestedCategory)
       setQuestions(rawQuestions.map(normalizeQuestion))
       setScreen('playing')
     } catch {
@@ -90,11 +112,15 @@ function App() {
       return
     }
 
-    setSelectedAnswer(answer)
     const isCorrectAnswer = answer === currentQuestion.correctAnswer
+    setSelectedAnswer(answer)
     setAnswerStatus(isCorrectAnswer ? 'Correct' : 'Incorrect')
-
     setScore((currentScore) => (isCorrectAnswer ? currentScore + 10 : currentScore - 5))
+    if (isCorrectAnswer) {
+      setCorrectCount((currentCount) => currentCount + 1)
+    } else {
+      setIncorrectCount((currentCount) => currentCount + 1)
+    }
   }
 
   const handleNextQuestion = () => {
@@ -115,10 +141,17 @@ function App() {
     setSelectedAnswer('')
     setAnswerStatus('')
     setScore(0)
+    setCorrectCount(0)
+    setIncorrectCount(0)
     setError('')
+    setIsScoreSaved(false)
   }
 
   const handleSaveScore = () => {
+    if (isScoreSaved) {
+      return
+    }
+
     const trimmedPlayerName = playerName.trim()
     if (!trimmedPlayerName) {
       return
@@ -128,15 +161,18 @@ function App() {
       ...leaderboard,
       {
         name: trimmedPlayerName,
+        category: selectedCategoryLabel,
         score,
-        totalQuestions: questions.length,
+        correctCount,
+        incorrectCount,
         timestamp: new Date().toISOString(),
       },
     ]
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => (b.score - a.score) || (b.correctCount - a.correctCount))
       .slice(0, 10)
 
     setLeaderboard(updatedLeaderboard)
+    setIsScoreSaved(true)
     localStorage.setItem('brain-busters-leaderboard', JSON.stringify(updatedLeaderboard))
   }
 
@@ -157,66 +193,83 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen bg-sky-500 px-4 py-8 md:px-8">
-      <div className="mx-auto flex w-full max-w-5xl items-center justify-center">
-        <div className="w-full max-w-sm rounded-[2rem] border-6 border-slate-900 bg-gradient-to-b from-yellow-300 to-yellow-200 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] md:w-1/2 md:max-w-md">
-          <div className="mb-3 flex justify-center">
+    <main className="min-h-screen bg-sky-500 px-4 py-6 sm:py-8 md:px-8">
+      <div className="mx-auto flex w-full max-w-5xl justify-center">
+        <div className="w-full max-w-sm rounded-[2rem] border-[7px] border-slate-900 bg-gradient-to-b from-yellow-300 to-yellow-200 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] md:w-1/2 md:max-w-md">
+          <div className="mb-4 flex justify-center">
             <span className="h-3 w-3 rounded-full bg-slate-900"></span>
           </div>
 
-          <div className="min-h-[32rem] rounded-[1.4rem] border border-yellow-400/80 bg-yellow-200/60 p-5 sm:p-6">
+          <div className="min-h-[38rem] rounded-[1.5rem] border-2 border-yellow-400/80 bg-yellow-200/70 p-5 sm:p-6">
             {isLoading && (
-              <section className="flex h-full min-h-[27rem] flex-col items-center justify-center gap-4 text-center">
-                <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-400 border-t-slate-900"></div>
+              <section className="flex min-h-[33rem] flex-col items-center justify-center gap-4 text-center">
+                <div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-400 border-t-slate-900"></div>
                 <p className="text-lg font-semibold text-slate-800">Loading...</p>
-                <p className="text-sm text-slate-600">Fetching trivia questions from OpenTDB</p>
+                <p className="text-sm text-slate-700">Fetching questions from OpenTDB</p>
               </section>
             )}
 
             {!isLoading && screen === 'start' && (
-              <section className="flex h-full min-h-[27rem] flex-col items-center justify-between py-6 text-center">
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <img
-                      src={brainBustersLogo}
-                      alt="Brain Busters logo"
-                      className="mx-auto h-20 w-20"
-                    />
-                    <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-700">
-                      Brain Busters
-                    </p>
+              <section className="flex min-h-[33rem] flex-col items-center justify-between gap-6 py-2 text-center">
+                <div className="space-y-4">
+                  <img
+                    src={brainBustersLogo}
+                    alt="Brain Busters logo"
+                    className="mx-auto w-72 max-w-full sm:w-80"
+                  />
+                  <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-700">
+                    Brain Busters
+                  </p>
+                  <div className="mx-auto max-w-[15.5rem] rounded-[2.2rem] border-[5px] border-slate-800 bg-white px-6 py-7 shadow-lg">
+                    <p className="text-4xl font-black tracking-wide text-slate-900">TRIVIA QUIZ</p>
                   </div>
-                  <div className="mx-auto max-w-[15rem] rounded-[2.2rem] border-4 border-slate-800 bg-white px-6 py-8 shadow-lg">
-                    <p className="text-4xl font-black tracking-wide text-slate-900">GEOGRAPHY</p>
-                  </div>
-                  <p className="text-sm font-medium text-slate-700">10 questions · +10 / -5 scoring</p>
+                  <p className="text-base font-semibold text-slate-700">10 questions · +10 / -5 scoring</p>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="space-y-2 text-left">
-                    <label
-                      htmlFor="playerName"
-                      className="block text-sm font-semibold uppercase tracking-wide text-slate-700"
-                    >
-                      Player Name
-                    </label>
-                    <input
-                      id="playerName"
-                      type="text"
-                      value={playerName}
-                      onChange={(event) => setPlayerName(event.target.value)}
-                      className="w-full rounded-lg border-2 border-slate-900 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none ring-offset-2 focus:ring-2 focus:ring-slate-900"
-                      placeholder="Enter your name"
-                    />
-                  </div>
+                <div className="w-full max-w-[23rem] space-y-3 text-left">
+                  <label
+                    htmlFor="playerName"
+                    className="block text-sm font-bold uppercase tracking-wide text-slate-700"
+                  >
+                    Player Name
+                  </label>
+                  <input
+                    id="playerName"
+                    type="text"
+                    value={playerName}
+                    onChange={(event) => setPlayerName(event.target.value)}
+                    className="w-full rounded-xl border-2 border-slate-900 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none ring-offset-2 focus:ring-2 focus:ring-slate-900"
+                    placeholder="Enter your name"
+                  />
+
+                  <label
+                    htmlFor="category"
+                    className="block text-sm font-bold uppercase tracking-wide text-slate-700"
+                  >
+                    Category
+                  </label>
+                  <select
+                    id="category"
+                    value={selectedCategory}
+                    onChange={(event) => setSelectedCategory(event.target.value)}
+                    className="w-full rounded-xl border-2 border-slate-900 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none ring-offset-2 focus:ring-2 focus:ring-slate-900"
+                  >
+                    {CATEGORY_OPTIONS.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+
                   {error && (
                     <p className="rounded-lg border border-red-300 bg-red-100 px-3 py-2 text-sm font-medium text-red-700">
                       {error}
                     </p>
                   )}
+
                   <button
                     type="button"
-                    className="rounded-xl border-2 border-slate-900 bg-white px-8 py-3 text-lg font-extrabold tracking-wide text-slate-900 transition hover:bg-slate-100"
+                    className="mx-auto block rounded-xl border-2 border-slate-900 bg-white px-10 py-3 text-lg font-extrabold tracking-wide text-slate-900 transition hover:bg-slate-100"
                     onClick={loadQuestions}
                   >
                     START
@@ -227,18 +280,24 @@ function App() {
 
             {!isLoading && screen === 'playing' && currentQuestion && (
               <section className="space-y-5">
-                <div className="flex items-center justify-center gap-2">
-                  <img src={brainBustersLogo} alt="" className="h-8 w-8" />
-                  <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-700">
-                    Brain Busters
-                  </p>
+                <div className="flex items-center justify-center">
+                  <img src={brainBustersLogo} alt="Brain Busters logo" className="w-60 max-w-full" />
                 </div>
+
                 <header className="space-y-3 text-center">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">
-                    Question {progressLabel}
+                    {selectedCategoryLabel} · Question {progressLabel}
                   </p>
-                  <div className="mx-auto inline-flex rounded-full border border-slate-900/20 bg-white/70 px-3 py-1 text-xs font-semibold text-slate-700">
-                    Score: {score}
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <span className="rounded-full border border-slate-900/30 bg-white/80 px-3 py-1 text-xs font-bold text-slate-800">
+                      Score: {score}
+                    </span>
+                    <span className="rounded-full border border-emerald-700/40 bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                      Correct: {correctCount}
+                    </span>
+                    <span className="rounded-full border border-rose-700/40 bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800">
+                      Incorrect: {incorrectCount}
+                    </span>
                   </div>
                 </header>
 
@@ -297,34 +356,34 @@ function App() {
             )}
 
             {!isLoading && screen === 'complete' && (
-              <section className="flex h-full min-h-[27rem] flex-col items-center justify-between py-6 text-center">
+              <section className="flex min-h-[33rem] flex-col items-center justify-between gap-5 py-2 text-center">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-center gap-2">
-                    <img src={brainBustersLogo} alt="" className="h-8 w-8" />
-                    <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-700">
-                      Brain Busters
-                    </p>
-                  </div>
+                  <img src={brainBustersLogo} alt="Brain Busters logo" className="mx-auto w-60 max-w-full" />
                   <p className="text-2xl font-black uppercase tracking-wide text-slate-900">
-                    Congratulations!
+                    Round Complete
                   </p>
-                  <div className="mx-auto max-w-[14rem] rounded-[2.2rem] border-4 border-slate-800 bg-white px-6 py-7 shadow-lg">
-                    <p className="text-4xl font-black text-slate-900">
-                      {score >= Math.ceil(questions.length * 0.6) ? 'YOU WIN!' : 'ROUND OVER'}
-                    </p>
+                  <div className="mx-auto max-w-[16rem] rounded-[2rem] border-4 border-slate-800 bg-white px-6 py-5 shadow-lg">
+                    <p className="text-3xl font-black text-slate-900">{score} pts</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-600">{selectedCategoryLabel}</p>
                   </div>
-                  <p className="text-lg font-semibold text-slate-700">
-                    Final score: {score} points
-                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <span className="rounded-full border border-emerald-700/40 bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                      Correct: {correctCount}
+                    </span>
+                    <span className="rounded-full border border-rose-700/40 bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800">
+                      Incorrect: {incorrectCount}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="w-full space-y-4">
+                <div className="w-full space-y-3">
                   <button
                     type="button"
-                    className="w-full rounded-xl border-2 border-emerald-700 bg-emerald-500 px-5 py-2 text-base font-bold text-white transition hover:bg-emerald-600"
+                    className="w-full rounded-xl border-2 border-emerald-700 bg-emerald-500 px-5 py-2 text-base font-bold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300"
                     onClick={handleSaveScore}
+                    disabled={isScoreSaved}
                   >
-                    Save to Leaderboard
+                    {isScoreSaved ? 'Saved to Leaderboard' : 'Save to Leaderboard'}
                   </button>
 
                   <div className="rounded-xl border-2 border-slate-900 bg-white/80 p-3 text-left">
@@ -338,12 +397,17 @@ function App() {
                         {leaderboard.map((player, index) => (
                           <li
                             key={`${player.name}-${player.timestamp}-${index}`}
-                            className="flex items-center justify-between rounded-md bg-slate-100 px-2 py-1 text-sm"
+                            className="rounded-md bg-slate-100 px-2 py-1 text-sm"
                           >
-                            <span className="font-semibold text-slate-800">
-                              {index + 1}. {player.name}
-                            </span>
-                            <span className="font-black text-slate-900">{player.score} pts</span>
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-slate-800">
+                                {index + 1}. {player.name}
+                              </span>
+                              <span className="font-black text-slate-900">{player.score} pts</span>
+                            </div>
+                            <p className="text-xs font-medium text-slate-600">
+                              {player.category} · {player.correctCount}C / {player.incorrectCount}I
+                            </p>
                           </li>
                         ))}
                       </ol>
@@ -351,20 +415,20 @@ function App() {
                   </div>
 
                   <div className="flex flex-col gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    className="rounded-xl border-2 border-slate-900 bg-white px-5 py-2 text-base font-bold text-slate-900 transition hover:bg-slate-100"
-                    onClick={loadQuestions}
-                  >
-                    Play Again
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-xl border-2 border-slate-900 bg-slate-900 px-5 py-2 text-base font-bold text-white transition hover:bg-slate-700"
-                    onClick={handleResetToStart}
-                  >
-                    Back to Start
-                  </button>
+                    <button
+                      type="button"
+                      className="flex-1 rounded-xl border-2 border-slate-900 bg-white px-5 py-2 text-base font-bold text-slate-900 transition hover:bg-slate-100"
+                      onClick={loadQuestions}
+                    >
+                      Play Again
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1 rounded-xl border-2 border-slate-900 bg-slate-900 px-5 py-2 text-base font-bold text-white transition hover:bg-slate-700"
+                      onClick={handleResetToStart}
+                    >
+                      Back to Start
+                    </button>
                   </div>
                 </div>
               </section>

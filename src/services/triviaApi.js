@@ -1,12 +1,17 @@
 const OPENTDB_API_ENDPOINT = 'https://opentdb.com/api.php'
 
-export async function fetchTriviaQuestions(amount = 10) {
+export async function fetchTriviaQuestions(amount = 10, category) {
   try {
-    const query = new URLSearchParams({
+    const queryParams = {
       amount: String(amount),
-      category: '22',
       type: 'multiple',
-    })
+    }
+
+    if (category) {
+      queryParams.category = String(category)
+    }
+
+    const query = new URLSearchParams(queryParams)
     const response = await fetch(`${OPENTDB_API_ENDPOINT}?${query.toString()}`)
 
     if (!response.ok) {
