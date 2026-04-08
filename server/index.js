@@ -43,6 +43,14 @@ function writeLeaderboard(entries) {
   fs.writeFileSync(leaderboardFile, JSON.stringify(sortLeaderboard(entries), null, 2), 'utf-8')
 }
 
+function createEntryId() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID()
+  }
+
+  return `bb-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 app.get('/api/leaderboard', (_request, response) => {
   try {
     const leaderboard = sortLeaderboard(readLeaderboard())
@@ -81,7 +89,7 @@ app.post('/api/leaderboard', (request, response) => {
   try {
     const leaderboard = readLeaderboard()
     const nextEntry = {
-      id: crypto.randomUUID(),
+      id: createEntryId(),
       name: name.trim().slice(0, 30),
       category: category.trim().slice(0, 40),
       score: parsedScore,

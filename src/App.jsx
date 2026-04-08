@@ -211,7 +211,9 @@ function App() {
       setIsScoreSaved(true)
     } catch (err) {
       setLeaderboardError(
-        err instanceof Error ? err.message : 'Could not save score. Please try again.',
+        err instanceof Error
+          ? err.message
+          : 'Could not save score. Please make sure server is running and try again.',
       )
     } finally {
       setIsSavingScore(false)
