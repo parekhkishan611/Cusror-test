@@ -27,16 +27,26 @@ Install dependencies:
 npm install
 ```
 
-Start leaderboard server (port 8787):
-
-```bash
-npm run server
-```
-
-In a second terminal, start the frontend (port 5173):
+Start both frontend and backend together (recommended):
 
 ```bash
 npm run dev
+```
+
+This starts:
+- frontend on `http://localhost:5173`
+- leaderboard server on `http://localhost:8787`
+
+If you only want the client:
+
+```bash
+npm run dev:client
+```
+
+If you only want the leaderboard server:
+
+```bash
+npm run server
 ```
 
 The Vite dev server proxies `/api/*` requests to `http://localhost:8787`.

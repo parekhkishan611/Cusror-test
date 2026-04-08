@@ -209,8 +209,10 @@ function App() {
       })
       setLeaderboard(updatedLeaderboard)
       setIsScoreSaved(true)
-    } catch {
-      setLeaderboardError('Could not save score. Please try again.')
+    } catch (err) {
+      setLeaderboardError(
+        err instanceof Error ? err.message : 'Could not save score. Please try again.',
+      )
     } finally {
       setIsSavingScore(false)
     }
