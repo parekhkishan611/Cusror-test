@@ -3,6 +3,7 @@ const LEADERBOARD_API_FALLBACK_URL = 'http://localhost:8787/api/leaderboard'
 const LEADERBOARD_REQUEST_TIMEOUT_MS = 8000
 const LOCAL_LEADERBOARD_STORAGE_KEY = 'brain-busters-leaderboard-local-fallback'
 const REMOTE_LEADERBOARD_API_URL = import.meta.env.VITE_LEADERBOARD_API_URL?.trim() || ''
+const GLOBAL_LEADERBOARD_TIMEOUT_MS = 20000
 
 export const leaderboardMode = REMOTE_LEADERBOARD_API_URL ? 'global' : 'local'
 
@@ -13,6 +14,38 @@ function createRequestTimeoutSignal(timeoutMs) {
     signal: controller.signal,
     clear: () => clearTimeout(timeoutId),
   }
+}
+
+function sanitizeTrailingSlashes(value) {
+  return value.replace(/\/+$/, '')
+}
+
+function buildRemoteLeaderboardEndpoints() {
+  const cleaned = sanitizeTrailingSlashes(REMOTE_LEADERBOARD_API_URL)
+  const endpoints = new Set([cleaned])
+
+  try {
+    const parsed = new URL(cleaned)
+    const pathname = sanitizeTrailingSlashes(parsed.pathname)
+
+    if (!pathname.endsWith('/api/leaderboard')) {
+      const inferredPath = pathname.endsWith('/api')
+        ? `${pathname}/leaderboard`
+        : `${pathname}/api/leaderboard`
+      parsed.pathname = inferredPath
+      endpoints.add(parsed.toString())
+    }
+  } catch {
+    if (!cleaned.endsWith('/api/leaderboard')) {
+      if (cleaned.endsWith('/api')) {
+        endpoints.add(`${cleaned}/leaderboard`)
+      } else {
+        endpoints.add(`${cleaned}/api/leaderboard`)
+      }
+    }
+  }
+
+  return [...endpoints]
 }
 
 async function parseErrorMessage(response) {
@@ -38,7 +71,7 @@ async function parseErrorMessage(response) {
 
 function getLeaderboardEndpoints() {
   if (REMOTE_LEADERBOARD_API_URL) {
-    return [REMOTE_LEADERBOARD_API_URL]
+    return buildRemoteLeaderboardEndpoints()
   }
 
   return [LEADERBOARD_API_BASE_URL, LEADERBOARD_API_FALLBACK_URL]
@@ -46,10 +79,13 @@ function getLeaderboardEndpoints() {
 
 async function requestLeaderboard(options) {
   const endpoints = getLeaderboardEndpoints()
+  const timeoutMs = REMOTE_LEADERBOARD_API_URL
+    ? GLOBAL_LEADERBOARD_TIMEOUT_MS
+    : LEADERBOARD_REQUEST_TIMEOUT_MS
   let lastError = null
 
   for (const endpoint of endpoints) {
-    const timeout = createRequestTimeoutSignal(LEADERBOARD_REQUEST_TIMEOUT_MS)
+    const timeout = createRequestTimeoutSignal(timeoutMs)
     try {
       const response = await fetch(endpoint, { ...options, signal: timeout.signal })
       if (response.ok) {
@@ -154,9 +190,13 @@ export async function fetchLeaderboard() {
 
     writeLocalLeaderboard(data)
     return sortLeaderboard(data)
-  } catch {
+  } catch (error) {
     if (REMOTE_LEADERBOARD_API_URL) {
-      throw new Error('Global leaderboard unavailable. Please try again shortly.')
+      const details =
+        error instanceof Error ? error.message : 'Unknown global leaderboard error.'
+      throw new Error(
+        `Global leaderboard unavailable (${details}). Check VITE_LEADERBOARD_API_URL value.`,
+      )
     }
 
     // Local fallback keeps local development usable if backend is down.
@@ -181,10 +221,12 @@ export async function saveScoreToLeaderboard(payload) {
 
     writeLocalLeaderboard(data)
     return sortLeaderboard(data)
-  } catch {
+  } catch (error) {
     if (REMOTE_LEADERBOARD_API_URL) {
+      const details =
+        error instanceof Error ? error.message : 'Unknown global leaderboard save error.'
       throw new Error(
-        'Global leaderboard unavailable. Please check your leaderboard API URL and try again.',
+        `Global leaderboard unavailable (${details}). Please check your leaderboard API URL and try again.`,
       )
     }
 
