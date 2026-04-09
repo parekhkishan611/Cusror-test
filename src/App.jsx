@@ -306,7 +306,7 @@ function App() {
 
   return (
     <main className="min-h-screen bg-sky-500 px-4 py-6 sm:py-8 md:px-8">
-      <div className="mx-auto flex w-full max-w-[1280px] flex-col items-center gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,auto)] lg:items-start lg:gap-0">
+      <div className="mx-auto flex w-full max-w-[1280px] flex-col items-center gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-start lg:gap-0">
         <div className="w-full max-w-sm rounded-[2rem] border-[7px] border-slate-900 bg-gradient-to-b from-yellow-300 to-yellow-200 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] sm:max-w-md lg:col-start-2 lg:justify-self-center">
           <div className="mb-4 flex justify-center">
             <span className="h-3 w-3 rounded-full bg-slate-900"></span>
