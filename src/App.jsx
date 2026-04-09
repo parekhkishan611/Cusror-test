@@ -62,6 +62,8 @@ function App() {
   const [leaderboardError, setLeaderboardError] = useState('')
   const [isSavingScore, setIsSavingScore] = useState(false)
   const [isScoreSaved, setIsScoreSaved] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(10)
+  const [isTimeUp, setIsTimeUp] = useState(false)
 
   const currentQuestion = questions[currentQuestionIndex]
   const hasAnsweredCurrentQuestion = selectedAnswer.length > 0
@@ -80,6 +82,8 @@ function App() {
   }, [questions.length, currentQuestionIndex, screen])
 
   const didWin = useMemo(() => score > 60, [score])
+  const timerProgress = useMemo(() => Math.max((timeLeft / 10) * 100, 0), [timeLeft])
+  const isTimerCritical = timeLeft <= 3
 
   const loadLeaderboard = useCallback(async () => {
     setIsLeaderboardLoading(true)
@@ -89,9 +93,7 @@ function App() {
       setLeaderboard(nextLeaderboard)
       setLeaderboardError('')
     } catch (err) {
-      setLeaderboardError(
-        err instanceof Error ? err.message : 'Leaderboard unavailable. Please try again.',
-      )
+      setLeaderboardError(err instanceof Error ? err.message : 'Leaderboard unavailable.')
     } finally {
       setIsLeaderboardLoading(false)
     }
@@ -100,6 +102,32 @@ function App() {
   useEffect(() => {
     loadLeaderboard()
   }, [loadLeaderboard])
+
+  useEffect(() => {
+    if (screen !== 'playing' || !currentQuestion || hasAnsweredCurrentQuestion) {
+      return
+    }
+
+    setIsTimeUp(false)
+    setTimeLeft(10)
+    const timerId = window.setInterval(() => {
+      setTimeLeft((previous) => {
+        if (previous <= 1) {
+          window.clearInterval(timerId)
+          setSelectedAnswer('__timeout__')
+          setAnswerStatus('Incorrect')
+          setIsTimeUp(true)
+          setScore((currentScore) => currentScore - 5)
+          setIncorrectCount((currentCount) => currentCount + 1)
+          return 0
+        }
+
+        return previous - 1
+      })
+    }, 1000)
+
+    return () => window.clearInterval(timerId)
+  }, [screen, currentQuestion, hasAnsweredCurrentQuestion, currentQuestionIndex])
 
   const loadQuestions = async () => {
     if (!playerName.trim()) {
@@ -123,6 +151,8 @@ function App() {
     setCurrentQuestionIndex(0)
     setIsScoreSaved(false)
     setLeaderboardError('')
+    setTimeLeft(10)
+    setIsTimeUp(false)
 
     try {
       const requestedCategory = selectedCategory === 'random' ? undefined : selectedCategory
@@ -145,6 +175,7 @@ function App() {
     const isCorrectAnswer = answer === currentQuestion.correctAnswer
     setSelectedAnswer(answer)
     setAnswerStatus(isCorrectAnswer ? 'Correct' : 'Incorrect')
+    setIsTimeUp(false)
     setScore((currentScore) => (isCorrectAnswer ? currentScore + 10 : currentScore - 5))
     if (isCorrectAnswer) {
       setCorrectCount((currentCount) => currentCount + 1)
@@ -162,6 +193,8 @@ function App() {
     setCurrentQuestionIndex((index) => index + 1)
     setSelectedAnswer('')
     setAnswerStatus('')
+    setIsTimeUp(false)
+    setTimeLeft(10)
   }
 
   const handleResetToStart = () => {
@@ -179,6 +212,8 @@ function App() {
     setError('')
     setIsScoreSaved(false)
     setLeaderboardError('')
+    setTimeLeft(10)
+    setIsTimeUp(false)
   }
 
   const handlePlayAgain = () => {
@@ -195,6 +230,8 @@ function App() {
     setError('')
     setIsScoreSaved(false)
     setLeaderboardError('')
+    setTimeLeft(10)
+    setIsTimeUp(false)
   }
 
   const handleSaveScore = async () => {
@@ -250,8 +287,8 @@ function App() {
 
   return (
     <main className="min-h-screen bg-sky-500 px-4 py-6 sm:py-8 md:px-8">
-      <div className="mx-auto flex w-full max-w-5xl justify-center">
-        <div className="w-full max-w-sm rounded-[2rem] border-[7px] border-slate-900 bg-gradient-to-b from-yellow-300 to-yellow-200 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] md:w-1/2 md:max-w-md">
+      <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-6 lg:flex-row lg:items-start lg:justify-center">
+        <div className="w-full max-w-sm rounded-[2rem] border-[7px] border-slate-900 bg-gradient-to-b from-yellow-300 to-yellow-200 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] md:w-1/2 md:max-w-md lg:flex-none">
           <div className="mb-4 flex justify-center">
             <span className="h-3 w-3 rounded-full bg-slate-900"></span>
           </div>
@@ -368,6 +405,22 @@ function App() {
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">
                     {selectedCategoryLabel} · Question {progressLabel}
                   </p>
+                  <div className="space-y-1 rounded-xl border border-slate-900/20 bg-white/70 px-3 py-2">
+                    <div className="flex items-center justify-between text-xs font-bold uppercase">
+                      <span className={isTimerCritical ? 'text-rose-700' : 'text-slate-700'}>
+                        Time Left
+                      </span>
+                      <span className={isTimerCritical ? 'text-rose-700' : 'text-slate-900'}>
+                        {timeLeft}s
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        className={`h-full transition-all duration-500 ${isTimerCritical ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                        style={{ width: `${timerProgress}%` }}
+                      />
+                    </div>
+                  </div>
                   <div className="flex flex-wrap justify-center gap-2">
                     <span className="rounded-full border border-slate-900/30 bg-white/80 px-3 py-1 text-xs font-bold text-slate-800">
                       Score: {score}
@@ -409,14 +462,18 @@ function App() {
                 <div className="flex flex-col gap-3 text-center">
                   <p
                     className={`text-lg font-bold ${
-                      !hasAnsweredCurrentQuestion
+                      isTimeUp
+                        ? 'text-rose-700'
+                        : !hasAnsweredCurrentQuestion
                         ? 'text-slate-700'
                         : answerStatus === 'Correct'
                           ? 'text-green-700'
                           : 'text-red-700'
                     }`}
                   >
-                    {!hasAnsweredCurrentQuestion
+                    {isTimeUp
+                      ? "Time's up! -5 points"
+                      : !hasAnsweredCurrentQuestion
                       ? 'Select an answer'
                       : answerStatus === 'Correct'
                         ? 'Correct'
@@ -477,46 +534,6 @@ function App() {
                         : 'Save to Leaderboard'}
                   </button>
 
-                  <div className="rounded-xl border-2 border-slate-900 bg-white/80 p-3 text-left">
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="text-sm font-black uppercase tracking-wide text-slate-800">
-                        Scoreboard
-                      </p>
-                      <span className="rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-700">
-                        {leaderboardMode === 'global' ? 'Global' : 'Local'}
-                      </span>
-                    </div>
-                    {isLeaderboardLoading ? (
-                      <p className="text-sm font-medium text-slate-600">
-                        Loading {leaderboardMode} leaderboard...
-                      </p>
-                    ) : leaderboard.length === 0 ? (
-                      <p className="text-sm font-medium text-slate-600">No scores yet.</p>
-                    ) : (
-                      <ol className="space-y-1">
-                        {leaderboard.map((player, index) => (
-                          <li
-                            key={player.id ?? `${player.name}-${player.createdAt}-${index}`}
-                            className="rounded-md bg-slate-100 px-2 py-1 text-sm"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-semibold text-slate-800">
-                                {index + 1}. {player.name}
-                              </span>
-                              <span className="font-black text-slate-900">{player.score} pts</span>
-                            </div>
-                            <p className="text-xs font-medium text-slate-600">
-                              {player.category} · {player.correctCount}C / {player.incorrectCount}I
-                            </p>
-                          </li>
-                        ))}
-                      </ol>
-                    )}
-                    {leaderboardError && (
-                      <p className="mt-2 text-xs font-semibold text-rose-700">{leaderboardError}</p>
-                    )}
-                  </div>
-
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <button
                       type="button"
@@ -538,6 +555,83 @@ function App() {
             )}
           </div>
         </div>
+
+        <aside className="w-full max-w-sm rounded-3xl border-[7px] border-slate-900 bg-gradient-to-b from-yellow-300 to-yellow-200 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] lg:sticky lg:top-6">
+          <div className="rounded-2xl border-2 border-yellow-400/80 bg-yellow-200/70 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-black uppercase tracking-wide text-slate-800">
+                  Global Leaderboard
+                </p>
+                <p className="text-xs font-medium text-slate-600">Live top players</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-700">
+                  {leaderboardMode === 'global' ? 'Global' : 'Local'}
+                </span>
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-700 bg-white px-2 py-1 text-[10px] font-bold uppercase text-slate-800 hover:bg-slate-100"
+                  onClick={loadLeaderboard}
+                  disabled={isLeaderboardLoading}
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {isLeaderboardLoading ? (
+              <p className="rounded-lg border border-slate-300 bg-white/80 px-3 py-2 text-sm font-medium text-slate-600">
+                Loading {leaderboardMode} leaderboard...
+              </p>
+            ) : leaderboard.length === 0 ? (
+              <p className="rounded-lg border border-slate-300 bg-white/80 px-3 py-2 text-sm font-medium text-slate-600">
+                No scores yet. Be the first player!
+              </p>
+            ) : (
+              <ol className="space-y-2">
+                {leaderboard.map((player, index) => (
+                  <li
+                    key={player.id ?? `${player.name}-${player.createdAt}-${index}`}
+                    className="rounded-xl border-2 border-slate-900/20 bg-white/90 px-3 py-2"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs font-black text-white">
+                            {index + 1}
+                          </span>
+                          <p className="truncate text-sm font-extrabold text-slate-900">{player.name}</p>
+                        </div>
+                        <p className="mt-1 truncate text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          {player.category}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-black text-slate-900">{player.score}</p>
+                        <p className="text-[10px] font-semibold uppercase text-slate-600">Score</p>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex gap-2 text-[10px] font-bold uppercase">
+                      <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                        C: {player.correctCount}
+                      </span>
+                      <span className="rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-rose-700">
+                        I: {player.incorrectCount}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+
+            {leaderboardError && (
+              <p className="mt-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                {leaderboardError}
+              </p>
+            )}
+          </div>
+        </aside>
       </div>
     </main>
   )
