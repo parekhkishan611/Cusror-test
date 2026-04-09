@@ -52,7 +52,10 @@ function createEntryId() {
 }
 
 function normalizeName(value) {
-  return value.trim().toLowerCase()
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
 }
 
 app.get('/api/leaderboard', (_request, response) => {

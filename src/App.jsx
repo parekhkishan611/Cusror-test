@@ -256,14 +256,13 @@ function App() {
             {!isLoading && screen === 'start' && (
               <section className="flex min-h-[33rem] flex-col items-center justify-between gap-6 py-2 text-center">
                 <div className="space-y-4">
-                  <img
-                    src={brainBustersLogo}
-                    alt="Brain Busters logo"
-                    className="mx-auto w-72 max-w-full sm:w-80"
-                  />
-                  <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-700">
-                    Brain Busters
-                  </p>
+                  <div className="flex w-full items-center justify-center">
+                    <img
+                      src={brainBustersLogo}
+                      alt="Brain Busters logo"
+                      className="block w-72 max-w-full object-contain sm:w-80"
+                    />
+                  </div>
                   <div className="mx-auto max-w-[15.5rem] rounded-[2.2rem] border-[5px] border-slate-800 bg-white px-6 py-7 shadow-lg">
                     <p className="text-4xl font-black tracking-wide text-slate-900">TRIVIA QUIZ</p>
                   </div>
@@ -345,8 +344,12 @@ function App() {
 
             {!isLoading && screen === 'playing' && currentQuestion && (
               <section className="space-y-5">
-                <div className="flex items-center justify-center">
-                  <img src={brainBustersLogo} alt="Brain Busters logo" className="w-60 max-w-full" />
+                <div className="flex w-full items-center justify-center">
+                  <img
+                    src={brainBustersLogo}
+                    alt="Brain Busters logo"
+                    className="block w-60 max-w-full object-contain"
+                  />
                 </div>
 
                 <header className="space-y-3 text-center">
@@ -423,15 +426,19 @@ function App() {
             {!isLoading && screen === 'complete' && (
               <section className="flex min-h-[33rem] flex-col items-center justify-between gap-5 py-2 text-center">
                 <div className="space-y-4">
-                  <img src={brainBustersLogo} alt="Brain Busters logo" className="mx-auto w-60 max-w-full" />
-                  <p className="text-2xl font-black uppercase tracking-wide text-slate-900">
-                    {didWin ? 'You Win!' : 'Game Over'}
-                  </p>
+                  <div className="flex w-full items-center justify-center">
+                    <img
+                      src={brainBustersLogo}
+                      alt="Brain Busters logo"
+                      className="block w-60 max-w-full object-contain"
+                    />
+                  </div>
+                  <p className="text-2xl font-black uppercase tracking-wide text-slate-900">Game Over</p>
                   <div className="mx-auto max-w-[16rem] rounded-[2rem] border-4 border-slate-800 bg-white px-6 py-5 shadow-lg">
                     <p className="text-3xl font-black text-slate-900">{score} pts</p>
                     <p className="mt-2 text-sm font-semibold text-slate-600">{selectedCategoryLabel}</p>
                     <p className="mt-1 text-xs font-bold uppercase text-slate-500">
-                      {didWin ? 'Great round!' : 'Better luck next time'}
+                      {didWin ? 'You won this round!' : 'Better luck next time'}
                     </p>
                   </div>
                   <div className="flex flex-wrap justify-center gap-2">
