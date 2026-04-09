@@ -1,0 +1,22 @@
+<svg width="520" height="160" viewBox="0 0 520 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bb-bg" x1="18" y1="8" x2="500" y2="152" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#1E40AF"/>
+    </linearGradient>
+    <linearGradient id="bb-accent" x1="48" y1="34" x2="132" y2="122" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FACC15"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+    <filter id="bb-shadow" x="0" y="0" width="520" height="160" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#0F172A" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <g filter="url(#bb-shadow)">
+    <rect x="6" y="8" width="508" height="144" rx="34" fill="url(#bb-bg)" stroke="#0B1329" stroke-width="8"/>
+  </g>
+  <circle cx="92" cy="80" r="44" fill="url(#bb-accent)" stroke="#F8FAFC" stroke-width="6"/>
+  <path d="M82 66h20l-15 18h15l-28 30 10-24H72l10-24z" fill="#0F172A"/>
+  <text x="156" y="72" font-family="Arial, sans-serif" font-size="44" font-weight="900" fill="#F8FAFC" letter-spacing="2.5">BRAIN</text>
+  <text x="156" y="118" font-family="Arial, sans-serif" font-size="44" font-weight="900" fill="#FACC15" letter-spacing="2.5">BUSTERS</text>
+</svg>
