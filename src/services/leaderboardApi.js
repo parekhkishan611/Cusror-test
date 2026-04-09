@@ -2,6 +2,9 @@ const LEADERBOARD_API_BASE_URL = '/api/leaderboard'
 const LEADERBOARD_API_FALLBACK_URL = 'http://localhost:8787/api/leaderboard'
 const LEADERBOARD_REQUEST_TIMEOUT_MS = 8000
 const LOCAL_LEADERBOARD_STORAGE_KEY = 'brain-busters-leaderboard-local-fallback'
+const REMOTE_LEADERBOARD_API_URL = import.meta.env.VITE_LEADERBOARD_API_URL?.trim() || ''
+
+export const leaderboardMode = REMOTE_LEADERBOARD_API_URL ? 'global' : 'local'
 
 function createRequestTimeoutSignal(timeoutMs) {
   const controller = new AbortController()
@@ -33,8 +36,16 @@ async function parseErrorMessage(response) {
   return `Leaderboard request failed with status ${response.status}.`
 }
 
+function getLeaderboardEndpoints() {
+  if (REMOTE_LEADERBOARD_API_URL) {
+    return [REMOTE_LEADERBOARD_API_URL]
+  }
+
+  return [LEADERBOARD_API_BASE_URL, LEADERBOARD_API_FALLBACK_URL]
+}
+
 async function requestLeaderboard(options) {
-  const endpoints = [LEADERBOARD_API_BASE_URL, LEADERBOARD_API_FALLBACK_URL]
+  const endpoints = getLeaderboardEndpoints()
   let lastError = null
 
   for (const endpoint of endpoints) {
@@ -59,7 +70,14 @@ async function requestLeaderboard(options) {
     }
   }
 
-  throw lastError ?? new Error('Leaderboard server is unavailable.')
+  throw (
+    lastError ??
+    new Error(
+      REMOTE_LEADERBOARD_API_URL
+        ? 'Global leaderboard server is unavailable right now.'
+        : 'Leaderboard server is unavailable.',
+    )
+  )
 }
 
 function normalizeName(value) {
@@ -137,7 +155,11 @@ export async function fetchLeaderboard() {
     writeLocalLeaderboard(data)
     return sortLeaderboard(data)
   } catch {
-    // Offline/local fallback keeps the game usable when backend is unreachable.
+    if (REMOTE_LEADERBOARD_API_URL) {
+      throw new Error('Global leaderboard unavailable. Please try again shortly.')
+    }
+
+    // Local fallback keeps local development usable if backend is down.
     return readLocalLeaderboard()
   }
 }
@@ -160,6 +182,12 @@ export async function saveScoreToLeaderboard(payload) {
     writeLocalLeaderboard(data)
     return sortLeaderboard(data)
   } catch {
+    if (REMOTE_LEADERBOARD_API_URL) {
+      throw new Error(
+        'Global leaderboard unavailable. Please check your leaderboard API URL and try again.',
+      )
+    }
+
     const currentLocal = readLocalLeaderboard()
     const mergedLocal = mergeScore(currentLocal, payload)
     writeLocalLeaderboard(mergedLocal)

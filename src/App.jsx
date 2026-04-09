@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchTriviaQuestions } from './services/triviaApi'
-import { fetchLeaderboard, saveScoreToLeaderboard } from './services/leaderboardApi'
+import { fetchLeaderboard, leaderboardMode, saveScoreToLeaderboard } from './services/leaderboardApi'
 import brainBustersLogo from './assets/brain-busters-logo.svg'
 
 const CATEGORY_OPTIONS = [
@@ -88,8 +88,10 @@ function App() {
       const nextLeaderboard = await fetchLeaderboard()
       setLeaderboard(nextLeaderboard)
       setLeaderboardError('')
-    } catch {
-      setLeaderboardError('Leaderboard unavailable. Showing local fallback scores.')
+    } catch (err) {
+      setLeaderboardError(
+        err instanceof Error ? err.message : 'Leaderboard unavailable. Please try again.',
+      )
     } finally {
       setIsLeaderboardLoading(false)
     }
@@ -472,11 +474,18 @@ function App() {
                   </button>
 
                   <div className="rounded-xl border-2 border-slate-900 bg-white/80 p-3 text-left">
-                    <p className="mb-2 text-sm font-black uppercase tracking-wide text-slate-800">
-                      Scoreboard
-                    </p>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-sm font-black uppercase tracking-wide text-slate-800">
+                        Scoreboard
+                      </p>
+                      <span className="rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-700">
+                        {leaderboardMode === 'global' ? 'Global' : 'Local'}
+                      </span>
+                    </div>
                     {isLeaderboardLoading ? (
-                      <p className="text-sm font-medium text-slate-600">Loading global leaderboard...</p>
+                      <p className="text-sm font-medium text-slate-600">
+                        Loading {leaderboardMode} leaderboard...
+                      </p>
                     ) : leaderboard.length === 0 ? (
                       <p className="text-sm font-medium text-slate-600">No scores yet.</p>
                     ) : (

@@ -6,10 +6,12 @@ Brain Busters is a responsive trivia web app with a game-style UI, category sele
 
 - One-question-at-a-time gameplay with immediate correct/incorrect feedback
 - Score rules: **+10** for correct answers and **-5** for incorrect answers
-- Category selector (5 categories + Random)
+- Expanded category selector (OpenTDB categories + Random)
 - Live counters for correct and incorrect answers
 - End-of-round result screen with explicit **Game Over** state for losing rounds
-- Global leaderboard API (`GET/POST /api/leaderboard`) with server-side persistence
+- Leaderboard modes:
+  - **Global** when `VITE_LEADERBOARD_API_URL` is configured
+  - **Local fallback** for offline/local reliability
 
 ## Trivia source
 
@@ -50,6 +52,24 @@ npm run server
 ```
 
 The Vite dev server proxies `/api/*` requests to `http://localhost:8787`.
+
+## Make leaderboard truly global
+
+To make the leaderboard shared across all users:
+
+1. Deploy the leaderboard backend to a public URL (for example on Render, Railway, Fly, etc.).
+2. Expose these endpoints:
+   - `GET /api/leaderboard`
+   - `POST /api/leaderboard`
+3. Set frontend environment variable to that full endpoint URL:
+
+```bash
+VITE_LEADERBOARD_API_URL=https://your-api-domain.com/api/leaderboard
+```
+
+In Vercel, set this under **Project Settings → Environment Variables** and redeploy.
+
+When this variable is set, the app runs in **Global** leaderboard mode.
 
 ## Build and lint
 
