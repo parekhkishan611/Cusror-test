@@ -5,7 +5,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const app = express()
-const port = process.env.PORT || 8787
+const defaultLeaderboardPort = 8787
+const port = Number(process.env.LEADERBOARD_PORT) || defaultLeaderboardPort
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
