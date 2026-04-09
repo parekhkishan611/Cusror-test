@@ -126,7 +126,6 @@ function normalizeName(value) {
 function sortLeaderboard(entries) {
   return [...entries]
     .sort((a, b) => (Number(b.score) - Number(a.score)) || (Number(b.correctCount) - Number(a.correctCount)))
-    .slice(0, 10)
 }
 
 function readLocalLeaderboard() {

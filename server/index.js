@@ -10,8 +10,11 @@ const port = Number(process.env.LEADERBOARD_PORT) || defaultLeaderboardPort
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const dataDirectory = path.join(__dirname, 'data')
-const leaderboardFile = path.join(dataDirectory, 'leaderboard.json')
+const defaultDataDirectory = path.join(__dirname, 'data')
+const leaderboardFilePath = process.env.LEADERBOARD_FILE_PATH
+  ? path.resolve(process.env.LEADERBOARD_FILE_PATH)
+  : path.join(defaultDataDirectory, 'leaderboard.json')
+const leaderboardDirectory = path.dirname(leaderboardFilePath)
 
 app.use(cors())
 app.use(express.json())
@@ -25,31 +28,29 @@ app.get('/', (_request, response) => {
 })
 
 function ensureLeaderboardFile() {
-  if (!fs.existsSync(dataDirectory)) {
-    fs.mkdirSync(dataDirectory, { recursive: true })
+  if (!fs.existsSync(leaderboardDirectory)) {
+    fs.mkdirSync(leaderboardDirectory, { recursive: true })
   }
 
-  if (!fs.existsSync(leaderboardFile)) {
-    fs.writeFileSync(leaderboardFile, JSON.stringify([], null, 2), 'utf-8')
+  if (!fs.existsSync(leaderboardFilePath)) {
+    fs.writeFileSync(leaderboardFilePath, JSON.stringify([], null, 2), 'utf-8')
   }
 }
 
 function readLeaderboard() {
   ensureLeaderboardFile()
-  const data = fs.readFileSync(leaderboardFile, 'utf-8')
+  const data = fs.readFileSync(leaderboardFilePath, 'utf-8')
   const parsed = JSON.parse(data)
   return Array.isArray(parsed) ? parsed : []
 }
 
 function sortLeaderboard(entries) {
-  return entries
-    .sort((a, b) => (b.score - a.score) || (b.correctCount - a.correctCount))
-    .slice(0, 10)
+  return entries.sort((a, b) => (b.score - a.score) || (b.correctCount - a.correctCount))
 }
 
 function writeLeaderboard(entries) {
   ensureLeaderboardFile()
-  fs.writeFileSync(leaderboardFile, JSON.stringify(sortLeaderboard(entries), null, 2), 'utf-8')
+  fs.writeFileSync(leaderboardFilePath, JSON.stringify(sortLeaderboard(entries), null, 2), 'utf-8')
 }
 
 function createEntryId() {

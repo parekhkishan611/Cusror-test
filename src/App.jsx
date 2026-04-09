@@ -102,7 +102,7 @@ function App() {
       .sort((a, b) => Number(b.score) - Number(a.score))
   }, [leaderboard])
 
-  const overallLeaders = useMemo(() => leaderboard.slice(0, 5), [leaderboard])
+  const overallLeaders = useMemo(() => leaderboard.slice(0, 3), [leaderboard])
 
   const loadLeaderboard = useCallback(async () => {
     setIsLeaderboardLoading(true)

@@ -71,6 +71,21 @@ In Vercel, set this under **Project Settings → Environment Variables** and red
 
 When this variable is set, the app runs in **Global** leaderboard mode.
 
+### Persistence note (important)
+
+If your leaderboard appears to reset after some time, your backend host is likely using ephemeral storage.
+Configure the backend to write to a persistent disk/path:
+
+- set `LEADERBOARD_FILE_PATH` to a persistent file location on your host
+- keep `LEADERBOARD_PORT` aligned with your runtime port config
+
+Example:
+
+```bash
+LEADERBOARD_FILE_PATH=/var/data/brain-busters/leaderboard.json
+LEADERBOARD_PORT=8787
+```
+
 ## Build and lint
 
 ```bash
