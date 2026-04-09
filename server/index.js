@@ -51,6 +51,10 @@ function createEntryId() {
   return `bb-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
+function normalizeName(value) {
+  return value.trim().toLowerCase()
+}
+
 app.get('/api/leaderboard', (_request, response) => {
   try {
     const leaderboard = sortLeaderboard(readLeaderboard())
@@ -88,21 +92,49 @@ app.post('/api/leaderboard', (request, response) => {
 
   try {
     const leaderboard = readLeaderboard()
-    const nextEntry = {
-      id: createEntryId(),
-      name: name.trim().slice(0, 30),
-      category: category.trim().slice(0, 40),
-      score: parsedScore,
-      correctCount: parsedCorrectCount,
-      incorrectCount: parsedIncorrectCount,
-      createdAt: new Date().toISOString(),
-    }
+    const trimmedName = name.trim().slice(0, 30)
+    const normalizedName = normalizeName(trimmedName)
+    const now = new Date().toISOString()
+    const existingEntryIndex = leaderboard.findIndex(
+      (entry) => normalizeName(entry.name) === normalizedName,
+    )
 
-    const updatedLeaderboard = sortLeaderboard([...leaderboard, nextEntry])
+    if (existingEntryIndex >= 0) {
+      const existingEntry = leaderboard[existingEntryIndex]
+      leaderboard[existingEntryIndex] = {
+        ...existingEntry,
+        name: trimmedName,
+        category: category.trim().slice(0, 40),
+        score: Number(existingEntry.score) + parsedScore,
+        correctCount: Number(existingEntry.correctCount) + parsedCorrectCount,
+        incorrectCount: Number(existingEntry.incorrectCount) + parsedIncorrectCount,
+        createdAt: now,
+      }
+    } else {
+      leaderboard.push({
+        id: createEntryId(),
+        name: trimmedName,
+        category: category.trim().slice(0, 40),
+        score: parsedScore,
+        correctCount: parsedCorrectCount,
+        incorrectCount: parsedIncorrectCount,
+        createdAt: now,
+      })
+    }
+    const updatedLeaderboard = sortLeaderboard(leaderboard)
     writeLeaderboard(updatedLeaderboard)
     response.status(201).json(updatedLeaderboard)
   } catch {
     response.status(500).json({ message: 'Could not save leaderboard.' })
+  }
+})
+
+app.delete('/api/leaderboard', (_request, response) => {
+  try {
+    writeLeaderboard([])
+    response.status(200).json([])
+  } catch {
+    response.status(500).json({ message: 'Could not reset leaderboard.' })
   }
 })
 
