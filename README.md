@@ -34,7 +34,7 @@ npm run dev
 ```
 
 This starts:
-- frontend on `http://localhost:5173`
+- frontend on `http://localhost:5173` (or next free Vite port)
 - leaderboard server on `http://localhost:8787`
 
 If you only want the client:

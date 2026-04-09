@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n server,client -c yellow,cyan \"npm:server\" \"vite\"",
+    "dev": "concurrently -k -n server,client -c yellow,cyan \"npm:server\" \"vite --host 0.0.0.0 --port 5173\"",
     "server": "node server/index.js",
     "dev:client": "vite",
     "build": "vite build",
