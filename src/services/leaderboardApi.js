@@ -1,6 +1,7 @@
 const LEADERBOARD_API_BASE_URL = '/api/leaderboard'
 const LEADERBOARD_API_FALLBACK_URL = 'http://localhost:8787/api/leaderboard'
 const LEADERBOARD_REQUEST_TIMEOUT_MS = 8000
+const LOCAL_LEADERBOARD_STORAGE_KEY = 'brain-busters-leaderboard-local-fallback'
 
 function createRequestTimeoutSignal(timeoutMs) {
   const controller = new AbortController()
@@ -61,37 +62,107 @@ async function requestLeaderboard(options) {
   throw lastError ?? new Error('Leaderboard server is unavailable.')
 }
 
-export async function fetchLeaderboard() {
-  const response = await requestLeaderboard()
-  const data = await response.json()
-  if (!Array.isArray(data)) {
-    throw new Error('Invalid leaderboard response')
+function normalizeName(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
+function sortLeaderboard(entries) {
+  return [...entries]
+    .sort((a, b) => (Number(b.score) - Number(a.score)) || (Number(b.correctCount) - Number(a.correctCount)))
+    .slice(0, 10)
+}
+
+function readLocalLeaderboard() {
+  try {
+    const raw = localStorage.getItem(LOCAL_LEADERBOARD_STORAGE_KEY)
+    if (!raw) {
+      return []
+    }
+
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? sortLeaderboard(parsed) : []
+  } catch {
+    return []
+  }
+}
+
+function writeLocalLeaderboard(entries) {
+  localStorage.setItem(LOCAL_LEADERBOARD_STORAGE_KEY, JSON.stringify(sortLeaderboard(entries)))
+}
+
+function mergeScore(entries, payload) {
+  const normalizedName = normalizeName(payload.name)
+  const existingIndex = entries.findIndex((entry) => normalizeName(entry.name) === normalizedName)
+  const now = new Date().toISOString()
+
+  if (existingIndex >= 0) {
+    const existing = entries[existingIndex]
+    entries[existingIndex] = {
+      ...existing,
+      name: payload.name,
+      category: payload.category,
+      score: Number(existing.score) + Number(payload.score),
+      correctCount: Number(existing.correctCount) + Number(payload.correctCount),
+      incorrectCount: Number(existing.incorrectCount) + Number(payload.incorrectCount),
+      createdAt: now,
+    }
+    return sortLeaderboard(entries)
   }
 
-  return data
+  return sortLeaderboard([
+    ...entries,
+    {
+      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      name: payload.name,
+      category: payload.category,
+      score: Number(payload.score),
+      correctCount: Number(payload.correctCount),
+      incorrectCount: Number(payload.incorrectCount),
+      createdAt: now,
+    },
+  ])
+}
+
+export async function fetchLeaderboard() {
+  try {
+    const response = await requestLeaderboard()
+    const data = await response.json()
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid leaderboard response')
+    }
+
+    writeLocalLeaderboard(data)
+    return sortLeaderboard(data)
+  } catch {
+    // Offline/local fallback keeps the game usable when backend is unreachable.
+    return readLocalLeaderboard()
+  }
 }
 
 export async function saveScoreToLeaderboard(payload) {
-  let response
   try {
-    response = await requestLeaderboard({
+    const response = await requestLeaderboard({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
     })
-  } catch (error) {
-    if (error instanceof Error && error.message) {
-      throw error
+
+    const data = await response.json()
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid leaderboard response')
     }
-    throw new Error('Leaderboard server is unavailable. Please run "npm run dev" and try again.')
-  }
 
-  const data = await response.json()
-  if (!Array.isArray(data)) {
-    throw new Error('Invalid leaderboard response')
+    writeLocalLeaderboard(data)
+    return sortLeaderboard(data)
+  } catch {
+    const currentLocal = readLocalLeaderboard()
+    const mergedLocal = mergeScore(currentLocal, payload)
+    writeLocalLeaderboard(mergedLocal)
+    return mergedLocal
   }
-
-  return data
 }

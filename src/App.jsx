@@ -5,10 +5,21 @@ import brainBustersLogo from './assets/brain-busters-logo.svg'
 
 const CATEGORY_OPTIONS = [
   { id: '9', label: 'General Knowledge' },
+  { id: '10', label: 'Entertainment: Books' },
+  { id: '11', label: 'Entertainment: Film' },
+  { id: '12', label: 'Entertainment: Music' },
+  { id: '14', label: 'Entertainment: Television' },
+  { id: '15', label: 'Entertainment: Video Games' },
+  { id: '17', label: 'Science & Nature' },
+  { id: '18', label: 'Science: Computers' },
+  { id: '19', label: 'Science: Mathematics' },
+  { id: '20', label: 'Mythology' },
+  { id: '21', label: 'Sports' },
   { id: '22', label: 'Geography' },
   { id: '23', label: 'History' },
-  { id: '17', label: 'Science & Nature' },
-  { id: '21', label: 'Sports' },
+  { id: '24', label: 'Politics' },
+  { id: '25', label: 'Art' },
+  { id: '27', label: 'Animals' },
   { id: 'random', label: 'Random' },
 ]
 
@@ -76,8 +87,9 @@ function App() {
     try {
       const nextLeaderboard = await fetchLeaderboard()
       setLeaderboard(nextLeaderboard)
+      setLeaderboardError('')
     } catch {
-      setLeaderboardError('Global leaderboard is unavailable right now.')
+      setLeaderboardError('Leaderboard unavailable. Showing local fallback scores.')
     } finally {
       setIsLeaderboardLoading(false)
     }
@@ -206,12 +218,9 @@ function App() {
       })
       setLeaderboard(updatedLeaderboard)
       setIsScoreSaved(true)
-    } catch (err) {
-      setLeaderboardError(
-        err instanceof Error
-          ? err.message
-          : 'Could not save score. Please make sure server is running and try again.',
-      )
+      setLeaderboardError('')
+    } catch {
+      setLeaderboardError('Score save failed.')
     } finally {
       setIsSavingScore(false)
     }
