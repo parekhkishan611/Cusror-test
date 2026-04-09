@@ -1,5 +1,15 @@
 const LEADERBOARD_API_BASE_URL = '/api/leaderboard'
 const LEADERBOARD_API_FALLBACK_URL = 'http://localhost:8787/api/leaderboard'
+const LEADERBOARD_REQUEST_TIMEOUT_MS = 8000
+
+function createRequestTimeoutSignal(timeoutMs) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  return {
+    signal: controller.signal,
+    clear: () => clearTimeout(timeoutId),
+  }
+}
 
 async function parseErrorMessage(response) {
   try {
@@ -27,16 +37,24 @@ async function requestLeaderboard(options) {
   let lastError = null
 
   for (const endpoint of endpoints) {
+    const timeout = createRequestTimeoutSignal(LEADERBOARD_REQUEST_TIMEOUT_MS)
     try {
-      const response = await fetch(endpoint, options)
+      const response = await fetch(endpoint, { ...options, signal: timeout.signal })
       if (response.ok) {
+        timeout.clear()
         return response
       }
 
       const message = await parseErrorMessage(response)
       lastError = new Error(message)
+      timeout.clear()
     } catch (error) {
-      lastError = error
+      timeout.clear()
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        lastError = new Error('Leaderboard request timed out. Please try again.')
+      } else {
+        lastError = error
+      }
     }
   }
 

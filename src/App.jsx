@@ -68,10 +68,7 @@ function App() {
     return `${currentQuestionIndex + 1}/${questions.length}`
   }, [questions.length, currentQuestionIndex, screen])
 
-  const didWin = useMemo(
-    () => correctCount >= Math.ceil(Math.max(questions.length, 1) * 0.6),
-    [correctCount, questions.length],
-  )
+  const didWin = useMemo(() => score > 60, [score])
 
   const loadLeaderboard = useCallback(async () => {
     setIsLeaderboardLoading(true)
@@ -438,7 +435,7 @@ function App() {
                     <p className="text-3xl font-black text-slate-900">{score} pts</p>
                     <p className="mt-2 text-sm font-semibold text-slate-600">{selectedCategoryLabel}</p>
                     <p className="mt-1 text-xs font-bold uppercase text-slate-500">
-                      {didWin ? 'You won this round!' : 'Better luck next time'}
+                      {didWin ? 'You won this game!' : 'You lost'}
                     </p>
                   </div>
                   <div className="flex flex-wrap justify-center gap-2">
