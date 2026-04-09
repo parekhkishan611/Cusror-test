@@ -221,8 +221,12 @@ function App() {
       setLeaderboard(updatedLeaderboard)
       setIsScoreSaved(true)
       setLeaderboardError('')
-    } catch {
-      setLeaderboardError('Score save failed.')
+    } catch (err) {
+      setLeaderboardError(
+        err instanceof Error
+          ? err.message
+          : 'Score save failed. Please verify leaderboard API configuration.',
+      )
     } finally {
       setIsSavingScore(false)
     }
