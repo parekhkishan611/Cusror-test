@@ -16,6 +16,14 @@ const leaderboardFile = path.join(dataDirectory, 'leaderboard.json')
 app.use(cors())
 app.use(express.json())
 
+app.get('/', (_request, response) => {
+  response.status(200).json({
+    service: 'brain-busters-leaderboard-api',
+    status: 'ok',
+    endpoints: ['/api/leaderboard'],
+  })
+})
+
 function ensureLeaderboardFile() {
   if (!fs.existsSync(dataDirectory)) {
     fs.mkdirSync(dataDirectory, { recursive: true })
