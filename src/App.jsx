@@ -78,6 +78,7 @@ function App() {
   const [isEditingName, setIsEditingName] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState('')
   const [nicheModes, setNicheModes] = useState(() => generateNicheModes())
+  const [selectedNicheModeId, setSelectedNicheModeId] = useState('')
   const [questions, setQuestions] = useState([])
   const [screen, setScreen] = useState('start')
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -98,14 +99,15 @@ function App() {
 
   const currentQuestion = questions[currentQuestionIndex]
   const hasAnsweredCurrentQuestion = selectedAnswer.length > 0
-  const availableCategoryOptions = useMemo(
-    () => [...CATEGORY_OPTIONS, ...nicheModes],
-    [nicheModes],
-  )
-
   const selectedCategoryLabel = useMemo(
-    () => availableCategoryOptions.find((option) => option.id === selectedCategory)?.label ?? 'Random',
-    [availableCategoryOptions, selectedCategory],
+    () => {
+      if (selectedNicheModeId) {
+        return nicheModes.find((mode) => mode.id === selectedNicheModeId)?.label ?? 'Niche Mode'
+      }
+
+      return CATEGORY_OPTIONS.find((option) => option.id === selectedCategory)?.label ?? 'Random'
+    },
+    [nicheModes, selectedCategory, selectedNicheModeId],
   )
 
   const progressLabel = useMemo(() => {
@@ -214,8 +216,8 @@ function App() {
       setError('Please enter your player name to start.')
       return
     }
-    if (!selectedCategory) {
-      setError('Please choose a category to start.')
+    if (!selectedCategory && !selectedNicheModeId) {
+      setError('Please choose a category or Niche Mode to start.')
       return
     }
 
@@ -236,8 +238,8 @@ function App() {
 
     try {
       let rawQuestions
-      if (selectedCategory.startsWith('niche-')) {
-        const selectedNicheMode = nicheModes.find((mode) => mode.id === selectedCategory)
+      if (selectedNicheModeId) {
+        const selectedNicheMode = nicheModes.find((mode) => mode.id === selectedNicheModeId)
         if (!selectedNicheMode) {
           throw new Error('Failed to load questions. Please try again.')
         }
@@ -291,6 +293,7 @@ function App() {
     setPlayerName('')
     setIsEditingName(true)
     setSelectedCategory('')
+    setSelectedNicheModeId('')
     setQuestions([])
     setCurrentQuestionIndex(0)
     setSelectedAnswer('')
@@ -309,6 +312,7 @@ function App() {
     setScreen('start')
     setIsEditingName(false)
     setSelectedCategory('')
+    setSelectedNicheModeId('')
     setQuestions([])
     setCurrentQuestionIndex(0)
     setSelectedAnswer('')
@@ -321,6 +325,7 @@ function App() {
     setLeaderboardError('')
     setTimeLeft(10)
     setIsTimeUp(false)
+    setNicheModes(generateNicheModes())
   }
 
   const handleSaveScore = async () => {
@@ -336,10 +341,12 @@ function App() {
     setIsSavingScore(true)
     setLeaderboardError('')
 
+    const leaderboardCategory = selectedNicheModeId ? 'Niche Mode' : selectedCategoryLabel
+
     try {
       const updatedLeaderboard = await saveScoreToLeaderboard({
         name: trimmedPlayerName,
-        category: selectedCategoryLabel,
+        category: leaderboardCategory,
         score,
         correctCount,
         incorrectCount,
@@ -375,9 +382,10 @@ function App() {
   }
 
   const handleGenerateNicheModes = () => {
-    setNicheModes(generateNicheModes())
-    if (selectedCategory.startsWith('niche-')) {
-      setSelectedCategory('')
+    const nextNicheModes = generateNicheModes()
+    setNicheModes(nextNicheModes)
+    if (selectedNicheModeId) {
+      setSelectedNicheModeId(nextNicheModes[0]?.id ?? '')
     }
   }
 
@@ -457,32 +465,58 @@ function App() {
                   <select
                     id="category"
                     value={selectedCategory}
-                    onChange={(event) => setSelectedCategory(event.target.value)}
+                    onChange={(event) => {
+                      setSelectedCategory(event.target.value)
+                      setSelectedNicheModeId('')
+                    }}
                     className="w-full rounded-xl border-2 border-slate-900 bg-white px-3 py-2 text-base font-semibold text-slate-900 outline-none ring-offset-2 focus:ring-2 focus:ring-slate-900"
                   >
                     <option value="" disabled>
                       Select a category
                     </option>
-                    {availableCategoryOptions.map((option) => (
+                    {CATEGORY_OPTIONS.map((option) => (
                       <option key={option.id} value={option.id}>
                         {option.label}
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    className="w-full rounded-lg border-2 border-slate-800 bg-slate-900 px-3 py-2 text-xs font-bold uppercase tracking-wide text-yellow-200 transition hover:bg-slate-700"
-                    onClick={handleGenerateNicheModes}
-                  >
-                    Generate Niche Modes
-                  </button>
-                  <ul className="rounded-lg border border-slate-800/30 bg-white/70 px-3 py-2 text-[11px] font-semibold text-slate-700">
-                    {nicheModes.map((mode) => (
-                      <li key={mode.id}>
-                        <span className="font-black">{mode.label.replace('Niche Mode: ', '')}</span>: {mode.details}
-                      </li>
-                    ))}
-                  </ul>
+
+                  <div className="space-y-2 rounded-xl border border-slate-800/30 bg-white/70 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-black uppercase tracking-wide text-slate-700">
+                        Niche Mode
+                      </p>
+                      <button
+                        type="button"
+                        className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-bold uppercase text-yellow-200 transition hover:bg-slate-700"
+                        onClick={handleGenerateNicheModes}
+                      >
+                        Generate
+                      </button>
+                    </div>
+
+                    <ul className="space-y-1 text-[11px] font-semibold text-slate-700">
+                      {nicheModes.map((mode) => (
+                        <li key={mode.id}>
+                          <button
+                            type="button"
+                            className={`w-full rounded-md border px-2 py-1 text-left transition ${
+                              selectedNicheModeId === mode.id
+                                ? 'border-slate-900 bg-slate-900 text-yellow-200'
+                                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'
+                            }`}
+                            onClick={() => {
+                              setSelectedNicheModeId(mode.id)
+                              setSelectedCategory('')
+                            }}
+                          >
+                            <span className="font-black">{mode.label.replace('Niche Mode: ', '')}</span>
+                            <span className="block text-[10px] font-semibold opacity-90">{mode.details}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
                   {error && (
                     <p className="rounded-lg border border-red-300 bg-red-100 px-3 py-2 text-sm font-medium text-red-700">

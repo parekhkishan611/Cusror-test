@@ -11,35 +11,60 @@ const port = Number(process.env.LEADERBOARD_PORT) || defaultLeaderboardPort
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const defaultDataDirectory = path.join(__dirname, 'data')
-const leaderboardFilePath = process.env.LEADERBOARD_FILE_PATH
+const configuredLeaderboardFilePath = process.env.LEADERBOARD_FILE_PATH
   ? path.resolve(process.env.LEADERBOARD_FILE_PATH)
   : path.join(defaultDataDirectory, 'leaderboard.json')
-const leaderboardDirectory = path.dirname(leaderboardFilePath)
 
 app.use(cors())
 app.use(express.json())
 
 app.get('/', (_request, response) => {
+  const activeLeaderboardFilePath = resolveWritableLeaderboardFilePath()
+  const persistedInFallbackPath = activeLeaderboardFilePath !== configuredLeaderboardFilePath
+
   response.status(200).json({
     service: 'brain-busters-leaderboard-api',
     status: 'ok',
     endpoints: ['/api/leaderboard'],
+    persistence: {
+      configuredFilePath: configuredLeaderboardFilePath,
+      activeFilePath: activeLeaderboardFilePath,
+      usingFallbackPath: persistedInFallbackPath,
+    },
   })
 })
 
-function ensureLeaderboardFile() {
-  if (!fs.existsSync(leaderboardDirectory)) {
-    fs.mkdirSync(leaderboardDirectory, { recursive: true })
-  }
+function resolveWritableLeaderboardFilePath() {
+  try {
+    const directory = path.dirname(configuredLeaderboardFilePath)
+    if (!fs.existsSync(directory)) {
+      fs.mkdirSync(directory, { recursive: true })
+    }
+    return configuredLeaderboardFilePath
+  } catch {
+    if (configuredLeaderboardFilePath !== path.join(defaultDataDirectory, 'leaderboard.json')) {
+      const fallbackDirectory = defaultDataDirectory
+      if (!fs.existsSync(fallbackDirectory)) {
+        fs.mkdirSync(fallbackDirectory, { recursive: true })
+      }
+      return path.join(fallbackDirectory, 'leaderboard.json')
+    }
 
-  if (!fs.existsSync(leaderboardFilePath)) {
-    fs.writeFileSync(leaderboardFilePath, JSON.stringify([], null, 2), 'utf-8')
+    throw new Error('No writable leaderboard path available.')
   }
 }
 
+function ensureLeaderboardFile() {
+  const activeLeaderboardFilePath = resolveWritableLeaderboardFilePath()
+  if (!fs.existsSync(activeLeaderboardFilePath)) {
+    fs.writeFileSync(activeLeaderboardFilePath, JSON.stringify([], null, 2), 'utf-8')
+  }
+  return activeLeaderboardFilePath
+}
+
 function readLeaderboard() {
-  ensureLeaderboardFile()
-  const data = fs.readFileSync(leaderboardFilePath, 'utf-8')
+  const activeLeaderboardFilePath = ensureLeaderboardFile()
+  const data = fs.readFileSync(activeLeaderboardFilePath, 'utf-8')
   const parsed = JSON.parse(data)
   return Array.isArray(parsed) ? parsed : []
 }
@@ -49,8 +74,8 @@ function sortLeaderboard(entries) {
 }
 
 function writeLeaderboard(entries) {
-  ensureLeaderboardFile()
-  fs.writeFileSync(leaderboardFilePath, JSON.stringify(sortLeaderboard(entries), null, 2), 'utf-8')
+  const activeLeaderboardFilePath = ensureLeaderboardFile()
+  fs.writeFileSync(activeLeaderboardFilePath, JSON.stringify(sortLeaderboard(entries), null, 2), 'utf-8')
 }
 
 function createEntryId() {
