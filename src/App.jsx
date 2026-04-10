@@ -23,6 +23,36 @@ const CATEGORY_OPTIONS = [
   { id: 'random', label: 'Random' },
 ]
 
+const NICHE_MODE_COUNT = 3
+
+function shuffleArray(items) {
+  return [...items].sort(() => Math.random() - 0.5)
+}
+
+function generateNicheModes() {
+  const baseCategories = CATEGORY_OPTIONS.filter((option) => option.id !== 'random')
+  const shuffledCategories = shuffleArray(baseCategories)
+  const labels = ['Niche Mode: Explorer Mix', 'Niche Mode: Legends Mix', 'Niche Mode: Fusion Mix']
+
+  return Array.from({ length: NICHE_MODE_COUNT }, (_, index) => {
+    const startIndex = (index * 3) % shuffledCategories.length
+    const picked = [
+      shuffledCategories[startIndex],
+      shuffledCategories[(startIndex + 1) % shuffledCategories.length],
+      shuffledCategories[(startIndex + 2) % shuffledCategories.length],
+    ]
+    const categoryIds = picked.map((option) => option.id)
+    const details = picked.map((option) => option.label).join(' + ')
+
+    return {
+      id: `niche-${Date.now()}-${index}-${categoryIds.join('-')}`,
+      label: labels[index],
+      details,
+      categoryIds,
+    }
+  })
+}
+
 function decodeHtmlEntities(value) {
   const parser = new DOMParser()
   return parser.parseFromString(value, 'text/html').documentElement.textContent ?? value
@@ -47,6 +77,7 @@ function App() {
   const [playerName, setPlayerName] = useState('')
   const [isEditingName, setIsEditingName] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState('')
+  const [nicheModes, setNicheModes] = useState(() => generateNicheModes())
   const [questions, setQuestions] = useState([])
   const [screen, setScreen] = useState('start')
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -67,10 +98,14 @@ function App() {
 
   const currentQuestion = questions[currentQuestionIndex]
   const hasAnsweredCurrentQuestion = selectedAnswer.length > 0
+  const availableCategoryOptions = useMemo(
+    () => [...CATEGORY_OPTIONS, ...nicheModes],
+    [nicheModes],
+  )
 
   const selectedCategoryLabel = useMemo(
-    () => CATEGORY_OPTIONS.find((option) => option.id === selectedCategory)?.label ?? 'Random',
-    [selectedCategory],
+    () => availableCategoryOptions.find((option) => option.id === selectedCategory)?.label ?? 'Random',
+    [availableCategoryOptions, selectedCategory],
   )
 
   const progressLabel = useMemo(() => {
@@ -121,6 +156,32 @@ function App() {
   useEffect(() => {
     loadLeaderboard()
   }, [loadLeaderboard])
+
+  const fetchNicheModeQuestions = useCallback(async (amount, categoryIds) => {
+    const perCategoryAmount = Math.max(1, Math.ceil(amount / categoryIds.length))
+    const results = await Promise.allSettled(
+      categoryIds.map((categoryId) => fetchTriviaQuestions(perCategoryAmount, categoryId)),
+    )
+    const collectedQuestions = results
+      .filter((result) => result.status === 'fulfilled')
+      .flatMap((result) => result.value)
+
+    if (collectedQuestions.length < amount) {
+      const needed = amount - collectedQuestions.length
+      try {
+        const fallbackQuestions = await fetchTriviaQuestions(needed)
+        collectedQuestions.push(...fallbackQuestions)
+      } catch {
+        // Use whatever niche questions were fetched successfully.
+      }
+    }
+
+    if (collectedQuestions.length === 0) {
+      throw new Error('Failed to load questions. Please try again.')
+    }
+
+    return shuffleArray(collectedQuestions).slice(0, amount)
+  }, [])
 
   useEffect(() => {
     if (screen !== 'playing' || !currentQuestion || hasAnsweredCurrentQuestion) {
@@ -174,8 +235,17 @@ function App() {
     setIsTimeUp(false)
 
     try {
-      const requestedCategory = selectedCategory === 'random' ? undefined : selectedCategory
-      const rawQuestions = await fetchTriviaQuestions(10, requestedCategory)
+      let rawQuestions
+      if (selectedCategory.startsWith('niche-')) {
+        const selectedNicheMode = nicheModes.find((mode) => mode.id === selectedCategory)
+        if (!selectedNicheMode) {
+          throw new Error('Failed to load questions. Please try again.')
+        }
+        rawQuestions = await fetchNicheModeQuestions(10, selectedNicheMode.categoryIds)
+      } else {
+        const requestedCategory = selectedCategory === 'random' ? undefined : selectedCategory
+        rawQuestions = await fetchTriviaQuestions(10, requestedCategory)
+      }
       setQuestions(rawQuestions.map(normalizeQuestion))
       setScreen('playing')
     } catch {
@@ -304,6 +374,13 @@ function App() {
     return 'border-slate-200 bg-slate-100 text-slate-500'
   }
 
+  const handleGenerateNicheModes = () => {
+    setNicheModes(generateNicheModes())
+    if (selectedCategory.startsWith('niche-')) {
+      setSelectedCategory('')
+    }
+  }
+
   return (
     <main className="min-h-screen bg-sky-500 px-4 py-6 sm:py-8 md:px-8">
       <div className="mx-auto flex w-full max-w-[1280px] flex-col items-center gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-start lg:gap-0">
@@ -386,12 +463,26 @@ function App() {
                     <option value="" disabled>
                       Select a category
                     </option>
-                    {CATEGORY_OPTIONS.map((option) => (
+                    {availableCategoryOptions.map((option) => (
                       <option key={option.id} value={option.id}>
                         {option.label}
                       </option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    className="w-full rounded-lg border-2 border-slate-800 bg-slate-900 px-3 py-2 text-xs font-bold uppercase tracking-wide text-yellow-200 transition hover:bg-slate-700"
+                    onClick={handleGenerateNicheModes}
+                  >
+                    Generate Niche Modes
+                  </button>
+                  <ul className="rounded-lg border border-slate-800/30 bg-white/70 px-3 py-2 text-[11px] font-semibold text-slate-700">
+                    {nicheModes.map((mode) => (
+                      <li key={mode.id}>
+                        <span className="font-black">{mode.label.replace('Niche Mode: ', '')}</span>: {mode.details}
+                      </li>
+                    ))}
+                  </ul>
 
                   {error && (
                     <p className="rounded-lg border border-red-300 bg-red-100 px-3 py-2 text-sm font-medium text-red-700">
