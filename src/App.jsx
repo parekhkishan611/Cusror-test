@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { fetchAiNicheModeQuestions, fetchTriviaQuestions } from './services/triviaApi'
+import { fetchTriviaQuestions } from './services/triviaApi'
 import { fetchLeaderboard, leaderboardMode, saveScoreToLeaderboard } from './services/leaderboardApi'
 import brainBustersLogo from './assets/brain-busters-logo.svg'
 
@@ -159,6 +159,32 @@ function App() {
     loadLeaderboard()
   }, [loadLeaderboard])
 
+  const fetchNicheModeQuestions = useCallback(async (amount, categoryIds) => {
+    const perCategoryAmount = Math.max(1, Math.ceil(amount / categoryIds.length))
+    const results = await Promise.allSettled(
+      categoryIds.map((categoryId) => fetchTriviaQuestions(perCategoryAmount, categoryId)),
+    )
+    const collectedQuestions = results
+      .filter((result) => result.status === 'fulfilled')
+      .flatMap((result) => result.value)
+
+    if (collectedQuestions.length < amount) {
+      const needed = amount - collectedQuestions.length
+      try {
+        const fallbackQuestions = await fetchTriviaQuestions(needed)
+        collectedQuestions.push(...fallbackQuestions)
+      } catch {
+        // Use whatever niche questions were fetched successfully.
+      }
+    }
+
+    if (collectedQuestions.length === 0) {
+      throw new Error('Failed to load questions. Please try again.')
+    }
+
+    return shuffleArray(collectedQuestions).slice(0, amount)
+  }, [])
+
   useEffect(() => {
     if (screen !== 'playing' || !currentQuestion || hasAnsweredCurrentQuestion) {
       return
@@ -217,19 +243,15 @@ function App() {
         if (!selectedNicheMode) {
           throw new Error('Failed to load questions. Please try again.')
         }
-        rawQuestions = await fetchAiNicheModeQuestions(
-          10,
-          selectedNicheMode.label,
-          selectedNicheMode.details,
-        )
+        rawQuestions = await fetchNicheModeQuestions(10, selectedNicheMode.categoryIds)
       } else {
         const requestedCategory = selectedCategory === 'random' ? undefined : selectedCategory
         rawQuestions = await fetchTriviaQuestions(10, requestedCategory)
       }
       setQuestions(rawQuestions.map(normalizeQuestion))
       setScreen('playing')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load questions. Please try again.')
+    } catch {
+      setError('Failed to load questions. Please try again.')
       setScreen('start')
     } finally {
       setIsLoading(false)
@@ -380,11 +402,7 @@ function App() {
               <section className="flex min-h-[33rem] flex-col items-center justify-center gap-4 text-center">
                 <div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-400 border-t-slate-900"></div>
                 <p className="text-lg font-semibold text-slate-800">Loading...</p>
-                <p className="text-sm text-slate-700">
-                  {selectedNicheModeId
-                    ? 'Generating custom Niche Mode questions with AI'
-                    : 'Fetching questions from OpenTDB'}
-                </p>
+                <p className="text-sm text-slate-700">Fetching questions from OpenTDB</p>
               </section>
             )}
 
