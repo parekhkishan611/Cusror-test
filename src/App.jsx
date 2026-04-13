@@ -96,7 +96,9 @@ function App() {
   const [isScoreSaved, setIsScoreSaved] = useState(false)
   const [timeLeft, setTimeLeft] = useState(10)
   const [isTimeUp, setIsTimeUp] = useState(false)
+  const [isSoundEnabled, setIsSoundEnabled] = useState(true)
   const audioContextRef = useRef(null)
+  const endRoundSoundPlayedRef = useRef(false)
 
   const currentQuestion = questions[currentQuestionIndex]
   const hasAnsweredCurrentQuestion = selectedAnswer.length > 0
@@ -143,6 +145,10 @@ function App() {
   const overallLeaders = useMemo(() => leaderboard.slice(0, 3), [leaderboard])
 
   const ensureAudioReady = useCallback(async () => {
+    if (!isSoundEnabled) {
+      return null
+    }
+
     if (typeof window === 'undefined') {
       return null
     }
@@ -161,7 +167,7 @@ function App() {
     }
 
     return audioContextRef.current
-  }, [])
+  }, [isSoundEnabled])
 
   const playTone = useCallback(
     async ({ frequency, duration = 0.08, gain = 0.04, type = 'sine', whenOffset = 0 }) => {
@@ -211,7 +217,23 @@ function App() {
     void playTone({ frequency: 160, duration: 0.16, gain: 0.05, type: 'sawtooth', whenOffset: 0.06 })
   }, [playTone])
 
+  const playWinSound = useCallback(() => {
+    void playTone({ frequency: 660, duration: 0.12, gain: 0.05, type: 'triangle' })
+    void playTone({ frequency: 880, duration: 0.12, gain: 0.05, type: 'triangle', whenOffset: 0.12 })
+    void playTone({ frequency: 1040, duration: 0.16, gain: 0.055, type: 'triangle', whenOffset: 0.24 })
+  }, [playTone])
+
+  const playLoseSound = useCallback(() => {
+    void playTone({ frequency: 392, duration: 0.14, gain: 0.045, type: 'sine' })
+    void playTone({ frequency: 330, duration: 0.18, gain: 0.04, type: 'sine', whenOffset: 0.13 })
+    void playTone({ frequency: 294, duration: 0.22, gain: 0.035, type: 'sine', whenOffset: 0.28 })
+  }, [playTone])
+
   useEffect(() => {
+    if (!isSoundEnabled) {
+      return
+    }
+
     const unlockAudio = () => {
       void ensureAudioReady()
     }
@@ -223,7 +245,35 @@ function App() {
       window.removeEventListener('pointerdown', unlockAudio)
       window.removeEventListener('keydown', unlockAudio)
     }
-  }, [ensureAudioReady])
+  }, [ensureAudioReady, isSoundEnabled])
+
+  useEffect(() => {
+    if (screen !== 'complete') {
+      endRoundSoundPlayedRef.current = false
+      return
+    }
+
+    if (endRoundSoundPlayedRef.current) {
+      return
+    }
+
+    endRoundSoundPlayedRef.current = true
+    if (didWin) {
+      playWinSound()
+    } else {
+      playLoseSound()
+    }
+  }, [screen, didWin, playLoseSound, playWinSound])
+
+  const handleToggleSound = () => {
+    setIsSoundEnabled((current) => {
+      const next = !current
+      if (next) {
+        void ensureAudioReady()
+      }
+      return next
+    })
+  }
 
   const loadLeaderboard = useCallback(async () => {
     setIsLeaderboardLoading(true)
@@ -495,8 +545,19 @@ function App() {
     <main className="min-h-screen bg-sky-500 px-4 py-6 sm:py-8 md:px-8">
       <div className="mx-auto flex w-full max-w-[1280px] flex-col items-center gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-start lg:gap-0">
         <div className="w-full max-w-sm rounded-[2rem] border-[7px] border-slate-900 bg-gradient-to-b from-yellow-300 to-yellow-200 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] sm:max-w-md lg:col-start-2 lg:justify-self-center">
-          <div className="mb-4 flex justify-center">
+          <div className="mb-4 flex items-center justify-between">
             <span className="h-3 w-3 rounded-full bg-slate-900"></span>
+            <button
+              type="button"
+              className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wide transition ${
+                isSoundEnabled
+                  ? 'border-emerald-700 bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                  : 'border-slate-700 bg-slate-200 text-slate-700 hover:bg-slate-300'
+              }`}
+              onClick={handleToggleSound}
+            >
+              Sound: {isSoundEnabled ? 'On' : 'Off'}
+            </button>
           </div>
 
           <div className="min-h-[38rem] rounded-[1.5rem] border-2 border-yellow-400/80 bg-yellow-200/70 p-5 sm:p-6">
@@ -528,13 +589,13 @@ function App() {
                     </p>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-[11px] font-black uppercase sm:text-xs">
-                    <span className="rounded-full border-2 border-slate-800 bg-white px-2 py-1 text-slate-800">
+                    <span className="flex min-h-[3.4rem] items-center justify-center rounded-full border-2 border-slate-800 bg-white px-2 py-1 text-center leading-tight text-slate-800">
                       10 Questions
                     </span>
-                    <span className="rounded-full border-2 border-emerald-700 bg-emerald-100 px-2 py-1 text-emerald-800">
+                    <span className="flex min-h-[3.4rem] items-center justify-center rounded-full border-2 border-emerald-700 bg-emerald-100 px-2 py-1 text-center leading-tight text-emerald-800">
                       +10 / -5
                     </span>
-                    <span className="rounded-full border-2 border-rose-700 bg-rose-100 px-2 py-1 text-rose-800">
+                    <span className="flex min-h-[3.4rem] items-center justify-center rounded-full border-2 border-rose-700 bg-rose-100 px-2 py-1 text-center leading-tight text-rose-800">
                       10s Timer
                     </span>
                   </div>
