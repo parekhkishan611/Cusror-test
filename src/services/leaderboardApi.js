@@ -187,10 +187,24 @@ export async function fetchLeaderboard() {
       throw new Error('Invalid leaderboard response')
     }
 
-    writeLocalLeaderboard(data)
-    return sortLeaderboard(data)
+    const sortedRemote = sortLeaderboard(data)
+    const localBackup = readLocalLeaderboard()
+
+    // If a hosted leaderboard resets to empty unexpectedly, keep the local snapshot
+    // so demo users do not lose all visible history mid-session.
+    if (REMOTE_LEADERBOARD_API_URL && sortedRemote.length === 0 && localBackup.length > 0) {
+      return localBackup
+    }
+
+    writeLocalLeaderboard(sortedRemote)
+    return sortedRemote
   } catch (error) {
     if (REMOTE_LEADERBOARD_API_URL) {
+      const localBackup = readLocalLeaderboard()
+      if (localBackup.length > 0) {
+        return localBackup
+      }
+
       const details =
         error instanceof Error ? error.message : 'Unknown global leaderboard error.'
       throw new Error(
@@ -220,13 +234,12 @@ export async function saveScoreToLeaderboard(payload) {
 
     writeLocalLeaderboard(data)
     return sortLeaderboard(data)
-  } catch (error) {
+  } catch {
     if (REMOTE_LEADERBOARD_API_URL) {
-      const details =
-        error instanceof Error ? error.message : 'Unknown global leaderboard save error.'
-      throw new Error(
-        `Global leaderboard unavailable (${details}). Please check your leaderboard API URL and try again.`,
-      )
+      const currentLocal = readLocalLeaderboard()
+      const mergedLocal = mergeScore(currentLocal, payload)
+      writeLocalLeaderboard(mergedLocal)
+      return mergedLocal
     }
 
     const currentLocal = readLocalLeaderboard()

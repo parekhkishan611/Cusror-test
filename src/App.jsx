@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchTriviaQuestions } from './services/triviaApi'
 import { fetchLeaderboard, leaderboardMode, saveScoreToLeaderboard } from './services/leaderboardApi'
 import brainBustersLogo from './assets/brain-busters-logo.svg'
@@ -96,6 +96,7 @@ function App() {
   const [isScoreSaved, setIsScoreSaved] = useState(false)
   const [timeLeft, setTimeLeft] = useState(10)
   const [isTimeUp, setIsTimeUp] = useState(false)
+  const audioContextRef = useRef(null)
 
   const currentQuestion = questions[currentQuestionIndex]
   const hasAnsweredCurrentQuestion = selectedAnswer.length > 0
@@ -140,6 +141,89 @@ function App() {
   }, [leaderboard])
 
   const overallLeaders = useMemo(() => leaderboard.slice(0, 3), [leaderboard])
+
+  const ensureAudioReady = useCallback(async () => {
+    if (typeof window === 'undefined') {
+      return null
+    }
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext
+    if (!AudioContextClass) {
+      return null
+    }
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextClass()
+    }
+
+    if (audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume()
+    }
+
+    return audioContextRef.current
+  }, [])
+
+  const playTone = useCallback(
+    async ({ frequency, duration = 0.08, gain = 0.04, type = 'sine', whenOffset = 0 }) => {
+      const context = await ensureAudioReady()
+      if (!context) {
+        return
+      }
+
+      const oscillator = context.createOscillator()
+      const gainNode = context.createGain()
+      const startAt = context.currentTime + whenOffset
+      const endAt = startAt + duration
+
+      oscillator.type = type
+      oscillator.frequency.setValueAtTime(frequency, startAt)
+      gainNode.gain.setValueAtTime(0.0001, startAt)
+      gainNode.gain.exponentialRampToValueAtTime(gain, startAt + 0.02)
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, endAt)
+
+      oscillator.connect(gainNode)
+      gainNode.connect(context.destination)
+      oscillator.start(startAt)
+      oscillator.stop(endAt + 0.01)
+    },
+    [ensureAudioReady],
+  )
+
+  const playTimerTickSound = useCallback(
+    (nextSecond) => {
+      void playTone({
+        frequency: nextSecond <= 3 ? 960 : 640,
+        duration: nextSecond <= 3 ? 0.09 : 0.06,
+        gain: nextSecond <= 3 ? 0.045 : 0.025,
+        type: nextSecond <= 3 ? 'triangle' : 'sine',
+      })
+    },
+    [playTone],
+  )
+
+  const playCorrectSound = useCallback(() => {
+    void playTone({ frequency: 660, duration: 0.08, gain: 0.045, type: 'triangle' })
+    void playTone({ frequency: 880, duration: 0.12, gain: 0.05, type: 'triangle', whenOffset: 0.09 })
+  }, [playTone])
+
+  const playWrongSound = useCallback(() => {
+    void playTone({ frequency: 220, duration: 0.16, gain: 0.06, type: 'sawtooth' })
+    void playTone({ frequency: 160, duration: 0.16, gain: 0.05, type: 'sawtooth', whenOffset: 0.06 })
+  }, [playTone])
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      void ensureAudioReady()
+    }
+
+    window.addEventListener('pointerdown', unlockAudio)
+    window.addEventListener('keydown', unlockAudio)
+
+    return () => {
+      window.removeEventListener('pointerdown', unlockAudio)
+      window.removeEventListener('keydown', unlockAudio)
+    }
+  }, [ensureAudioReady])
 
   const loadLeaderboard = useCallback(async () => {
     setIsLeaderboardLoading(true)
@@ -201,17 +285,29 @@ function App() {
           setIsTimeUp(true)
           setScore((currentScore) => currentScore - 5)
           setIncorrectCount((currentCount) => currentCount + 1)
+          playWrongSound()
           return 0
         }
 
-        return previous - 1
+        const nextSecond = previous - 1
+        playTimerTickSound(nextSecond)
+        return nextSecond
       })
     }, 1000)
 
     return () => window.clearInterval(timerId)
-  }, [screen, currentQuestion, hasAnsweredCurrentQuestion, currentQuestionIndex])
+  }, [
+    screen,
+    currentQuestion,
+    hasAnsweredCurrentQuestion,
+    currentQuestionIndex,
+    playTimerTickSound,
+    playWrongSound,
+  ])
 
   const loadQuestions = async () => {
+    void ensureAudioReady()
+
     if (!playerName.trim()) {
       setError('Please enter your player name to start.')
       return
@@ -263,10 +359,16 @@ function App() {
       return
     }
 
+    void ensureAudioReady()
     const isCorrectAnswer = answer === currentQuestion.correctAnswer
     setSelectedAnswer(answer)
     setAnswerStatus(isCorrectAnswer ? 'Correct' : 'Incorrect')
     setIsTimeUp(false)
+    if (isCorrectAnswer) {
+      playCorrectSound()
+    } else {
+      playWrongSound()
+    }
     setScore((currentScore) => (isCorrectAnswer ? currentScore + 10 : currentScore - 5))
     if (isCorrectAnswer) {
       setCorrectCount((currentCount) => currentCount + 1)
@@ -407,8 +509,8 @@ function App() {
             )}
 
             {!isLoading && screen === 'start' && (
-              <section className="flex min-h-[33rem] flex-col items-center justify-between gap-6 py-2 text-center">
-                <div className="space-y-4">
+              <section className="flex min-h-[33rem] flex-col items-center justify-start gap-5 py-2 text-center">
+                <div className="w-full space-y-4 rounded-[1.8rem] border-4 border-slate-800 bg-white/80 px-4 py-5 shadow-lg">
                   <div className="flex w-full items-center justify-center">
                     <img
                       src={brainBustersLogo}
@@ -416,10 +518,26 @@ function App() {
                       className="block w-72 max-w-full object-contain sm:w-80"
                     />
                   </div>
-                  <div className="mx-auto max-w-[15.5rem] rounded-[2.2rem] border-[5px] border-slate-800 bg-white px-6 py-7 shadow-lg">
-                    <p className="text-4xl font-black tracking-wide text-slate-900">TRIVIA QUIZ</p>
+                  <div className="space-y-2">
+                    <span className="inline-block rounded-full border-2 border-slate-800 bg-yellow-300 px-4 py-1 text-xs font-black uppercase tracking-[0.2em] text-slate-900">
+                      Ready for a challenge?
+                    </span>
+                    <p className="text-4xl font-black tracking-wide text-slate-900 sm:text-5xl">TRIVIA QUIZ</p>
+                    <p className="text-sm font-semibold text-slate-700">
+                      Pick a category, beat the timer, and climb the global leaderboard.
+                    </p>
                   </div>
-                  <p className="text-base font-semibold text-slate-700">10 questions · +10 / -5 scoring</p>
+                  <div className="grid grid-cols-3 gap-2 text-[11px] font-black uppercase sm:text-xs">
+                    <span className="rounded-full border-2 border-slate-800 bg-white px-2 py-1 text-slate-800">
+                      10 Questions
+                    </span>
+                    <span className="rounded-full border-2 border-emerald-700 bg-emerald-100 px-2 py-1 text-emerald-800">
+                      +10 / -5
+                    </span>
+                    <span className="rounded-full border-2 border-rose-700 bg-rose-100 px-2 py-1 text-rose-800">
+                      10s Timer
+                    </span>
+                  </div>
                 </div>
 
                 <div className="w-full max-w-[23rem] space-y-3 text-left">
