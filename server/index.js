@@ -14,6 +14,7 @@ const defaultDataDirectory = path.join(__dirname, 'data')
 const configuredLeaderboardFilePath = process.env.LEADERBOARD_FILE_PATH
   ? path.resolve(process.env.LEADERBOARD_FILE_PATH)
   : path.join(defaultDataDirectory, 'leaderboard.json')
+const leaderboardBackupSuffix = '.bak'
 
 app.use(cors())
 app.use(express.json())
@@ -62,11 +63,56 @@ function ensureLeaderboardFile() {
   return activeLeaderboardFilePath
 }
 
+function getBackupFilePath(activeLeaderboardFilePath) {
+  return `${activeLeaderboardFilePath}${leaderboardBackupSuffix}`
+}
+
+function readLeaderboardFromFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return null
+  }
+
+  const raw = fs.readFileSync(filePath, 'utf-8')
+  const parsed = JSON.parse(raw)
+  if (!Array.isArray(parsed)) {
+    return null
+  }
+
+  return parsed
+}
+
 function readLeaderboard() {
   const activeLeaderboardFilePath = ensureLeaderboardFile()
-  const data = fs.readFileSync(activeLeaderboardFilePath, 'utf-8')
-  const parsed = JSON.parse(data)
-  return Array.isArray(parsed) ? parsed : []
+  const backupFilePath = getBackupFilePath(activeLeaderboardFilePath)
+  const primaryEntries = readLeaderboardFromFile(activeLeaderboardFilePath)
+
+  if (primaryEntries) {
+    if (primaryEntries.length === 0) {
+      const backupEntries = readLeaderboardFromFile(backupFilePath)
+      if (backupEntries && backupEntries.length > 0) {
+        fs.writeFileSync(
+          activeLeaderboardFilePath,
+          JSON.stringify(sortLeaderboard(backupEntries), null, 2),
+          'utf-8',
+        )
+        return backupEntries
+      }
+    }
+
+    return primaryEntries
+  }
+
+  const backupEntries = readLeaderboardFromFile(backupFilePath)
+  if (backupEntries) {
+    fs.writeFileSync(
+      activeLeaderboardFilePath,
+      JSON.stringify(sortLeaderboard(backupEntries), null, 2),
+      'utf-8',
+    )
+    return backupEntries
+  }
+
+  return []
 }
 
 function sortLeaderboard(entries) {
@@ -75,7 +121,13 @@ function sortLeaderboard(entries) {
 
 function writeLeaderboard(entries) {
   const activeLeaderboardFilePath = ensureLeaderboardFile()
-  fs.writeFileSync(activeLeaderboardFilePath, JSON.stringify(sortLeaderboard(entries), null, 2), 'utf-8')
+  const sortedEntries = sortLeaderboard(entries)
+  fs.writeFileSync(activeLeaderboardFilePath, JSON.stringify(sortedEntries, null, 2), 'utf-8')
+
+  if (sortedEntries.length > 0) {
+    const backupFilePath = getBackupFilePath(activeLeaderboardFilePath)
+    fs.writeFileSync(backupFilePath, JSON.stringify(sortedEntries, null, 2), 'utf-8')
+  }
 }
 
 function createEntryId() {
@@ -87,6 +139,13 @@ function createEntryId() {
 }
 
 function normalizeName(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
+function normalizeCategory(value) {
   return value
     .trim()
     .toLowerCase()
@@ -131,10 +190,14 @@ app.post('/api/leaderboard', (request, response) => {
   try {
     const leaderboard = readLeaderboard()
     const trimmedName = name.trim().slice(0, 30)
+    const trimmedCategory = category.trim().slice(0, 40)
     const normalizedName = normalizeName(trimmedName)
+    const normalizedCategory = normalizeCategory(trimmedCategory)
     const now = new Date().toISOString()
     const existingEntryIndex = leaderboard.findIndex(
-      (entry) => normalizeName(entry.name) === normalizedName,
+      (entry) =>
+        normalizeName(entry.name) === normalizedName &&
+        normalizeCategory(entry.category ?? '') === normalizedCategory,
     )
 
     if (existingEntryIndex >= 0) {
@@ -142,7 +205,7 @@ app.post('/api/leaderboard', (request, response) => {
       leaderboard[existingEntryIndex] = {
         ...existingEntry,
         name: trimmedName,
-        category: category.trim().slice(0, 40),
+        category: trimmedCategory,
         score: Number(existingEntry.score) + parsedScore,
         correctCount: Number(existingEntry.correctCount) + parsedCorrectCount,
         incorrectCount: Number(existingEntry.incorrectCount) + parsedIncorrectCount,
@@ -152,7 +215,7 @@ app.post('/api/leaderboard', (request, response) => {
       leaderboard.push({
         id: createEntryId(),
         name: trimmedName,
-        category: category.trim().slice(0, 40),
+        category: trimmedCategory,
         score: parsedScore,
         correctCount: parsedCorrectCount,
         incorrectCount: parsedIncorrectCount,
