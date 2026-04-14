@@ -593,10 +593,10 @@ function App() {
     ? 'border-slate-700 bg-gradient-to-b from-slate-900 to-slate-800 text-slate-100'
     : 'border-slate-900 bg-gradient-to-b from-yellow-300 to-yellow-200'
   const screenSurfaceClass = isDarkMode
-    ? 'border-slate-700 bg-slate-100/95'
+    ? 'border-slate-700 bg-slate-900/95'
     : 'border-yellow-400/80 bg-yellow-200/70'
   const topCardClass = isDarkMode
-    ? 'border-slate-700 bg-slate-100 text-slate-900'
+    ? 'border-slate-600 bg-slate-800 text-slate-100'
     : 'border-slate-800 bg-white/80 text-slate-900'
   const leaderboardShellClass = isDarkMode
     ? 'border-slate-700 bg-gradient-to-b from-slate-800 to-slate-900'
@@ -614,12 +614,12 @@ function App() {
         <div
           className={`w-full max-w-sm rounded-[2rem] border-[7px] p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] sm:max-w-md ${appShellClass}`}
         >
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span className={`h-3 w-3 rounded-full ${isDarkMode ? 'bg-slate-300' : 'bg-slate-900'}`}></span>
-            <div className="flex items-center gap-2">
+            <div className="grid w-full grid-cols-3 gap-2 sm:w-auto sm:grid-cols-3">
               <button
                 type="button"
-                className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wide transition ${
+                className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wide transition ${
                   isDarkMode
                     ? 'border-slate-500 bg-slate-700 text-slate-100 hover:bg-slate-600'
                     : 'border-slate-700 bg-white text-slate-700 hover:bg-slate-100'
@@ -630,7 +630,7 @@ function App() {
               </button>
               <button
                 type="button"
-                className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wide transition ${
+                className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wide transition ${
                   isSoundEnabled
                     ? 'border-emerald-700 bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                     : 'border-slate-700 bg-slate-200 text-slate-700 hover:bg-slate-300'
@@ -641,7 +641,7 @@ function App() {
               </button>
               <button
                 type="button"
-                className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wide transition ${
+                className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wide transition ${
                   isDarkMode
                     ? 'border-amber-400/70 bg-amber-200/10 text-amber-200 hover:bg-amber-200/20'
                     : 'border-slate-700 bg-white text-slate-800 hover:bg-slate-100'
