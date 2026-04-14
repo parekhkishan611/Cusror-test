@@ -1014,19 +1014,25 @@ function App() {
               aria-label="Close leaderboard overlay"
             />
             <aside
-              className={`relative z-10 w-full max-w-[22rem] rounded-3xl border-[7px] p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] ${leaderboardShellClass}`}
+              className={`relative z-10 w-full max-w-[42rem] rounded-3xl border-[7px] p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] ${leaderboardShellClass}`}
             >
-            <div className={`rounded-2xl border-2 p-4 ${leaderboardInnerClass}`}>
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <p className={`text-sm font-black uppercase tracking-wide ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+            <div className={`rounded-2xl border-2 p-4 sm:p-5 ${leaderboardInnerClass}`}>
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p
+                    className={`break-words text-sm font-black uppercase tracking-wide sm:text-[1.9rem] ${
+                      isDarkMode ? 'text-slate-100' : 'text-slate-800'
+                    }`}
+                  >
                     Global Leaderboard
                   </p>
-                  <p className={`text-xs font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>Top leaders</p>
+                  <p className={`text-base font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                    Top leaders
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="grid w-full grid-cols-3 gap-2 sm:w-auto sm:grid-cols-3 sm:items-center">
                   <span
-                    className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${
+                    className={`flex min-h-[3.25rem] items-center justify-center rounded-xl border px-2 py-1 text-center text-sm font-bold uppercase sm:min-h-[2.7rem] ${
                       isDarkMode
                         ? 'border-slate-500 bg-slate-700 text-slate-200'
                         : 'border-slate-300 bg-slate-50 text-slate-700'
@@ -1036,18 +1042,18 @@ function App() {
                   </span>
                   <button
                     type="button"
-                    className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase ${
+                    className={`flex min-h-[3.25rem] items-center justify-center rounded-xl border px-2 py-1 text-center text-sm font-bold uppercase sm:min-h-[2.7rem] ${
                       isDarkMode
                         ? 'border-slate-500 bg-slate-700 text-slate-100 hover:bg-slate-600'
                         : 'border-slate-700 bg-white text-slate-800 hover:bg-slate-100'
                     }`}
                     onClick={() => setIsLeaderboardOpen(false)}
                   >
-                    Back to Game
+                    Back
                   </button>
                   <button
                     type="button"
-                    className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase ${
+                    className={`flex min-h-[3.25rem] items-center justify-center rounded-xl border px-2 py-1 text-center text-sm font-bold uppercase sm:min-h-[2.7rem] ${
                       isDarkMode
                         ? 'border-slate-500 bg-slate-700 text-slate-100 hover:bg-slate-600'
                         : 'border-slate-700 bg-white text-slate-800 hover:bg-slate-100'
