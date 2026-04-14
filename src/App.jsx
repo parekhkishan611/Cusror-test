@@ -97,6 +97,8 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(10)
   const [isTimeUp, setIsTimeUp] = useState(false)
   const [isSoundEnabled, setIsSoundEnabled] = useState(true)
+  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false)
   const audioContextRef = useRef(null)
   const endRoundSoundPlayedRef = useRef(false)
 
@@ -124,7 +126,6 @@ function App() {
   const didWin = useMemo(() => score > 60, [score])
   const timerProgress = useMemo(() => Math.max((timeLeft / 10) * 100, 0), [timeLeft])
   const isTimerCritical = timeLeft <= 3
-  const showSidebarLeaderboard = !isLoading && (screen === 'start' || screen === 'complete')
 
   const leadersByCategory = useMemo(() => {
     const bestByCategory = new Map()
@@ -248,6 +249,25 @@ function App() {
   }, [ensureAudioReady, isSoundEnabled])
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const savedDarkMode = window.localStorage.getItem('brain-busters-dark-mode')
+    if (savedDarkMode === 'true') {
+      setIsDarkMode(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    window.localStorage.setItem('brain-busters-dark-mode', isDarkMode ? 'true' : 'false')
+  }, [isDarkMode])
+
+  useEffect(() => {
     if (screen !== 'complete') {
       endRoundSoundPlayedRef.current = false
       return
@@ -275,6 +295,10 @@ function App() {
     })
   }
 
+  const handleToggleDarkMode = () => {
+    setIsDarkMode((current) => !current)
+  }
+
   const loadLeaderboard = useCallback(async () => {
     setIsLeaderboardLoading(true)
     setLeaderboardError('')
@@ -292,6 +316,29 @@ function App() {
   useEffect(() => {
     loadLeaderboard()
   }, [loadLeaderboard])
+
+  useEffect(() => {
+    if (!isLeaderboardOpen) {
+      return
+    }
+
+    loadLeaderboard()
+  }, [isLeaderboardOpen, loadLeaderboard])
+
+  useEffect(() => {
+    if (!isLeaderboardOpen) {
+      return
+    }
+
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsLeaderboardOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [isLeaderboardOpen])
 
   const fetchNicheModeQuestions = useCallback(async (amount, categoryIds) => {
     const perCategoryAmount = Math.max(1, Math.ceil(amount / categoryIds.length))
@@ -541,37 +588,87 @@ function App() {
     }
   }
 
+  const rootBackgroundClass = isDarkMode ? 'bg-slate-950' : 'bg-sky-500'
+  const appShellClass = isDarkMode
+    ? 'border-slate-700 bg-gradient-to-b from-slate-900 to-slate-800 text-slate-100'
+    : 'border-slate-900 bg-gradient-to-b from-yellow-300 to-yellow-200'
+  const screenSurfaceClass = isDarkMode
+    ? 'border-slate-700 bg-slate-100/95'
+    : 'border-yellow-400/80 bg-yellow-200/70'
+  const topCardClass = isDarkMode
+    ? 'border-slate-700 bg-slate-100 text-slate-900'
+    : 'border-slate-800 bg-white/80 text-slate-900'
+  const leaderboardShellClass = isDarkMode
+    ? 'border-slate-700 bg-gradient-to-b from-slate-800 to-slate-900'
+    : 'border-slate-900 bg-gradient-to-b from-yellow-300 to-yellow-200'
+  const leaderboardInnerClass = isDarkMode
+    ? 'border-slate-600 bg-slate-800/80 text-slate-100'
+    : 'border-yellow-400/80 bg-yellow-200/70'
+  const leaderboardItemClass = isDarkMode
+    ? 'border-slate-600 bg-slate-900/70 text-slate-100'
+    : 'border-slate-900/20 bg-white/90 text-slate-900'
+
   return (
-    <main className="min-h-screen bg-sky-500 px-4 py-6 sm:py-8 md:px-8">
-      <div className="mx-auto flex w-full max-w-[1280px] flex-col items-center gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-start lg:gap-0">
-        <div className="w-full max-w-sm rounded-[2rem] border-[7px] border-slate-900 bg-gradient-to-b from-yellow-300 to-yellow-200 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] sm:max-w-md lg:col-start-2 lg:justify-self-center">
+    <main className={`min-h-screen px-4 py-6 sm:py-8 md:px-8 ${rootBackgroundClass}`}>
+      <div className="mx-auto flex w-full max-w-[1280px] flex-col items-center gap-6">
+        <div
+          className={`w-full max-w-sm rounded-[2rem] border-[7px] p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] sm:max-w-md ${appShellClass}`}
+        >
           <div className="mb-4 flex items-center justify-between">
-            <span className="h-3 w-3 rounded-full bg-slate-900"></span>
-            <button
-              type="button"
-              className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wide transition ${
-                isSoundEnabled
-                  ? 'border-emerald-700 bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                  : 'border-slate-700 bg-slate-200 text-slate-700 hover:bg-slate-300'
-              }`}
-              onClick={handleToggleSound}
-            >
-              Sound: {isSoundEnabled ? 'On' : 'Off'}
-            </button>
+            <span className={`h-3 w-3 rounded-full ${isDarkMode ? 'bg-slate-300' : 'bg-slate-900'}`}></span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wide transition ${
+                  isDarkMode
+                    ? 'border-slate-500 bg-slate-700 text-slate-100 hover:bg-slate-600'
+                    : 'border-slate-700 bg-white text-slate-700 hover:bg-slate-100'
+                }`}
+                onClick={handleToggleDarkMode}
+              >
+                Theme: {isDarkMode ? 'Dark' : 'Light'}
+              </button>
+              <button
+                type="button"
+                className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wide transition ${
+                  isSoundEnabled
+                    ? 'border-emerald-700 bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                    : 'border-slate-700 bg-slate-200 text-slate-700 hover:bg-slate-300'
+                }`}
+                onClick={handleToggleSound}
+              >
+                Sound: {isSoundEnabled ? 'On' : 'Off'}
+              </button>
+              <button
+                type="button"
+                className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wide transition ${
+                  isDarkMode
+                    ? 'border-amber-400/70 bg-amber-200/10 text-amber-200 hover:bg-amber-200/20'
+                    : 'border-slate-700 bg-white text-slate-800 hover:bg-slate-100'
+                }`}
+                onClick={() => setIsLeaderboardOpen(true)}
+              >
+                🏆 Leaders
+              </button>
+            </div>
           </div>
 
-          <div className="min-h-[38rem] rounded-[1.5rem] border-2 border-yellow-400/80 bg-yellow-200/70 p-5 sm:p-6">
+          <div className={`min-h-[38rem] rounded-[1.5rem] border-2 p-5 sm:p-6 ${screenSurfaceClass}`}>
             {isLoading && (
               <section className="flex min-h-[33rem] flex-col items-center justify-center gap-4 text-center">
                 <div className="h-11 w-11 animate-spin rounded-full border-4 border-slate-400 border-t-slate-900"></div>
-                <p className="text-lg font-semibold text-slate-800">Loading...</p>
-                <p className="text-sm text-slate-700">Fetching questions from OpenTDB</p>
+                <p className={`text-lg font-semibold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+                  Loading...
+                </p>
+                <p className={`text-sm ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Fetching questions from OpenTDB
+                </p>
               </section>
             )}
 
             {!isLoading && screen === 'start' && (
               <section className="flex min-h-[33rem] flex-col items-center justify-start gap-5 py-2 text-center">
-                <div className="w-full space-y-4 rounded-[1.8rem] border-4 border-slate-800 bg-white/80 px-4 py-5 shadow-lg">
+                <div className={`w-full space-y-4 rounded-[1.8rem] border-4 px-4 py-5 shadow-lg ${topCardClass}`}>
                   <div className="flex w-full items-center justify-center">
                     <img
                       src={brainBustersLogo}
@@ -580,22 +677,52 @@ function App() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <span className="inline-block rounded-full border-2 border-slate-800 bg-yellow-300 px-4 py-1 text-xs font-black uppercase tracking-[0.2em] text-slate-900">
+                    <span
+                      className={`inline-block rounded-full border-2 px-4 py-1 text-xs font-black uppercase tracking-[0.2em] ${
+                        isDarkMode
+                          ? 'border-amber-300 bg-amber-300/25 text-amber-100'
+                          : 'border-slate-800 bg-yellow-300 text-slate-900'
+                      }`}
+                    >
                       Ready for a challenge?
                     </span>
-                    <p className="text-4xl font-black tracking-wide text-slate-900 sm:text-5xl">TRIVIA QUIZ</p>
-                    <p className="text-sm font-semibold text-slate-700">
+                    <p
+                      className={`text-4xl font-black tracking-wide sm:text-5xl ${
+                        isDarkMode ? 'text-slate-100' : 'text-slate-900'
+                      }`}
+                    >
+                      TRIVIA QUIZ
+                    </p>
+                    <p className={`text-sm font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                       Pick a category, beat the timer, and climb the global leaderboard.
                     </p>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-[11px] font-black uppercase sm:text-xs">
-                    <span className="flex min-h-[3.4rem] items-center justify-center rounded-full border-2 border-slate-800 bg-white px-2 py-1 text-center leading-tight text-slate-800">
+                    <span
+                      className={`flex min-h-[3.4rem] items-center justify-center rounded-full border-2 px-2 py-1 text-center leading-tight ${
+                        isDarkMode
+                          ? 'border-slate-400 bg-slate-700 text-slate-100'
+                          : 'border-slate-800 bg-white text-slate-800'
+                      }`}
+                    >
                       10 Questions
                     </span>
-                    <span className="flex min-h-[3.4rem] items-center justify-center rounded-full border-2 border-emerald-700 bg-emerald-100 px-2 py-1 text-center leading-tight text-emerald-800">
+                    <span
+                      className={`flex min-h-[3.4rem] items-center justify-center rounded-full border-2 px-2 py-1 text-center leading-tight ${
+                        isDarkMode
+                          ? 'border-emerald-300 bg-emerald-300/20 text-emerald-100'
+                          : 'border-emerald-700 bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
                       +10 / -5
                     </span>
-                    <span className="flex min-h-[3.4rem] items-center justify-center rounded-full border-2 border-rose-700 bg-rose-100 px-2 py-1 text-center leading-tight text-rose-800">
+                    <span
+                      className={`flex min-h-[3.4rem] items-center justify-center rounded-full border-2 px-2 py-1 text-center leading-tight ${
+                        isDarkMode
+                          ? 'border-rose-300 bg-rose-300/20 text-rose-100'
+                          : 'border-rose-700 bg-rose-100 text-rose-800'
+                      }`}
+                    >
                       10s Timer
                     </span>
                   </div>
@@ -879,23 +1006,52 @@ function App() {
           </div>
         </div>
 
-        {showSidebarLeaderboard && (
-          <aside className="w-full max-w-[22rem] rounded-3xl border-[7px] border-slate-900 bg-gradient-to-b from-yellow-300 to-yellow-200 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] lg:col-start-3 lg:ml-8 lg:mr-3 lg:justify-self-start lg:sticky lg:top-6">
-            <div className="rounded-2xl border-2 border-yellow-400/80 bg-yellow-200/70 p-4">
+        {isLeaderboardOpen && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/45 px-4 py-6 backdrop-blur-[1px]">
+            <div
+              className="absolute inset-0"
+              onClick={() => setIsLeaderboardOpen(false)}
+              aria-label="Close leaderboard overlay"
+            />
+            <aside
+              className={`relative z-10 w-full max-w-[22rem] rounded-3xl border-[7px] p-4 shadow-[0_20px_45px_rgba(15,23,42,0.45)] ${leaderboardShellClass}`}
+            >
+            <div className={`rounded-2xl border-2 p-4 ${leaderboardInnerClass}`}>
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div>
-                  <p className="text-sm font-black uppercase tracking-wide text-slate-800">
+                  <p className={`text-sm font-black uppercase tracking-wide ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
                     Global Leaderboard
                   </p>
-                  <p className="text-xs font-medium text-slate-600">Top leaders</p>
+                  <p className={`text-xs font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>Top leaders</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-700">
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${
+                      isDarkMode
+                        ? 'border-slate-500 bg-slate-700 text-slate-200'
+                        : 'border-slate-300 bg-slate-50 text-slate-700'
+                    }`}
+                  >
                     {leaderboardMode === 'global' ? 'Global' : 'Local'}
                   </span>
                   <button
                     type="button"
-                    className="rounded-md border border-slate-700 bg-white px-2 py-1 text-[10px] font-bold uppercase text-slate-800 hover:bg-slate-100"
+                    className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase ${
+                      isDarkMode
+                        ? 'border-slate-500 bg-slate-700 text-slate-100 hover:bg-slate-600'
+                        : 'border-slate-700 bg-white text-slate-800 hover:bg-slate-100'
+                    }`}
+                    onClick={() => setIsLeaderboardOpen(false)}
+                  >
+                    Back to Game
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-md border px-2 py-1 text-[10px] font-bold uppercase ${
+                      isDarkMode
+                        ? 'border-slate-500 bg-slate-700 text-slate-100 hover:bg-slate-600'
+                        : 'border-slate-700 bg-white text-slate-800 hover:bg-slate-100'
+                    }`}
                     onClick={loadLeaderboard}
                     disabled={isLeaderboardLoading}
                   >
@@ -905,17 +1061,29 @@ function App() {
               </div>
 
               {isLeaderboardLoading ? (
-                <p className="rounded-lg border border-slate-300 bg-white/80 px-3 py-2 text-sm font-medium text-slate-600">
+                <p
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+                    isDarkMode
+                      ? 'border-slate-600 bg-slate-800 text-slate-200'
+                      : 'border-slate-300 bg-white/80 text-slate-600'
+                  }`}
+                >
                   Loading {leaderboardMode} leaderboard...
                 </p>
               ) : leaderboard.length === 0 ? (
-                <p className="rounded-lg border border-slate-300 bg-white/80 px-3 py-2 text-sm font-medium text-slate-600">
+                <p
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+                    isDarkMode
+                      ? 'border-slate-600 bg-slate-800 text-slate-200'
+                      : 'border-slate-300 bg-white/80 text-slate-600'
+                  }`}
+                >
                   No scores yet. Be the first player!
                 </p>
               ) : (
                 <div className="space-y-3">
                   <section className="space-y-2">
-                    <h3 className="text-xs font-black uppercase tracking-wide text-slate-700">
+                    <h3 className={`text-xs font-black uppercase tracking-wide ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                       Overall Leaders
                     </h3>
                     <ol className="space-y-2">
@@ -924,21 +1092,21 @@ function App() {
                         return (
                           <li
                             key={player.id ?? `${player.name}-${player.createdAt}-${index}`}
-                            className="rounded-xl border-2 border-slate-900/20 bg-white/90 px-3 py-2"
+                            className={`rounded-xl border-2 px-3 py-2 ${leaderboardItemClass}`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-extrabold text-slate-900">
+                                <p className={`truncate text-sm font-extrabold ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
                                   {trophy ? `${trophy} ` : `${index + 1}. `}
                                   {player.name}
                                 </p>
-                                <p className="mt-1 truncate text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                <p className={`mt-1 truncate text-xs font-semibold uppercase tracking-wide ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                                   Top category: {player.category}
                                 </p>
                               </div>
                               <div className="text-right">
-                                <p className="text-lg font-black text-slate-900">{player.score}</p>
-                                <p className="text-[10px] font-semibold uppercase text-slate-600">Score</p>
+                                <p className={`text-lg font-black ${isDarkMode ? 'text-yellow-200' : 'text-slate-900'}`}>{player.score}</p>
+                                <p className={`text-[10px] font-semibold uppercase ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>Score</p>
                               </div>
                             </div>
                           </li>
@@ -948,21 +1116,21 @@ function App() {
                   </section>
 
                   <section className="space-y-2">
-                    <h3 className="text-xs font-black uppercase tracking-wide text-slate-700">
+                    <h3 className={`text-xs font-black uppercase tracking-wide ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                       Leaders by Category
                     </h3>
                     <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
                       {leadersByCategory.map((entry) => (
                         <div
                           key={entry.category}
-                          className="rounded-xl border-2 border-slate-900/20 bg-white/90 px-3 py-2"
+                          className={`rounded-xl border-2 px-3 py-2 ${leaderboardItemClass}`}
                         >
-                          <p className="truncate text-[11px] font-black uppercase tracking-wide text-slate-700">
+                          <p className={`truncate text-[11px] font-black uppercase tracking-wide ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                             {entry.category}
                           </p>
                           <div className="mt-1 flex items-center justify-between gap-2">
-                            <p className="truncate text-sm font-bold text-slate-900">{entry.name}</p>
-                            <p className="text-sm font-black text-slate-900">{entry.score}</p>
+                            <p className={`truncate text-sm font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>{entry.name}</p>
+                            <p className={`text-sm font-black ${isDarkMode ? 'text-yellow-200' : 'text-slate-900'}`}>{entry.score}</p>
                           </div>
                         </div>
                       ))}
@@ -972,12 +1140,13 @@ function App() {
               )}
 
               {leaderboardError && (
-                <p className="mt-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                <p className={`mt-3 rounded-lg border px-3 py-2 text-xs font-semibold ${isDarkMode ? 'border-rose-400/70 bg-rose-900/35 text-rose-200' : 'border-rose-300 bg-rose-50 text-rose-700'}`}>
                   {leaderboardError}
                 </p>
               )}
             </div>
-          </aside>
+            </aside>
+          </div>
         )}
       </div>
     </main>
